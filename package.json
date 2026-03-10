@@ -1,22 +1,23 @@
 {
-  "name": "my-pi-extension",
+  "name": "pi-promptsmith",
   "version": "0.1.0",
-  "description": "Starter template for building robust Pi extensions",
+  "description": "Intent-aware prompt rewriter and execution-contract compiler for Pi",
   "keywords": [
     "pi-package",
     "pi-extension",
-    "template"
+    "prompt-enhancer",
+    "prompt-engineering",
+    "coding-agent",
+    "promptsmith",
+    "ai"
   ],
   "type": "module",
   "main": "./src/index.ts",
   "files": [
     "src/",
-    "starters/",
-    "scripts/",
     "README.md"
   ],
   "scripts": {
-    "setup-template": "node ./scripts/setup.mjs",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
@@ -30,7 +31,15 @@
     "extensions": [
       "./src/index.ts"
     ],
-    "image": "https://placehold.co/1200x630/png?text=My+Pi+Extension"
+    "image": "https://raw.githubusercontent.com/ayagmar/pi-promptsmith/main/promptsmith.gif"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ayagmar/pi-promptsmith.git"
+  },
+  "homepage": "https://github.com/ayagmar/pi-promptsmith#readme",
+  "bugs": {
+    "url": "https://github.com/ayagmar/pi-promptsmith/issues"
   },
   "peerDependencies": {
     "@mariozechner/pi-ai": "*",

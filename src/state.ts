@@ -1,0 +1,269 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import {
+  DEFAULT_ENHANCEMENT_TIMEOUT_MS,
+  DEFAULT_SETTINGS,
+  MAX_ENHANCEMENT_TIMEOUT_MS,
+  MIN_ENHANCEMENT_TIMEOUT_MS,
+} from "./constants.js";
+import type {
+  ExactModelOverride,
+  FamilyEnhancerModels,
+  FamilyOverride,
+  ModelRef,
+  PromptsmithDraftResolution,
+  PromptsmithSettings,
+  SessionRestoreResult,
+} from "./types.js";
+import { UndoManager } from "./undo.js";
+
+export class PromptsmithRuntimeState {
+  private settings: PromptsmithSettings = cloneSettings(DEFAULT_SETTINGS);
+  private busy = false;
+  private lastDraftResolution: PromptsmithDraftResolution | undefined;
+  readonly undo = new UndoManager();
+
+  constructor(private readonly settingsPath = getGlobalSettingsPath()) {}
+
+  getSettings(): PromptsmithSettings {
+    return cloneSettings(this.settings);
+  }
+
+  replaceSettings(settings: PromptsmithSettings): void {
+    this.settings = cloneSettings(settings);
+    this.lastDraftResolution = undefined;
+  }
+
+  persistSettings(settings: PromptsmithSettings): void {
+    const nextSettings = cloneSettings(settings);
+    writeSettingsToDisk(this.settingsPath, nextSettings);
+    this.replaceSettings(nextSettings);
+  }
+
+  restoreSettings(cwd: string): SessionRestoreResult {
+    const restoredSettings = restorePersistedSettings(this.settingsPath, cwd);
+    const restored = restoredSettings ?? cloneSettings(DEFAULT_SETTINGS);
+    this.replaceSettings(restored);
+    this.busy = false;
+    this.undo.clear();
+    return { settings: this.getSettings(), restored: restoredSettings !== undefined };
+  }
+
+  getLastDraftResolution(): PromptsmithDraftResolution | undefined {
+    return this.lastDraftResolution ? { ...this.lastDraftResolution } : undefined;
+  }
+
+  rememberDraftResolution(resolution: PromptsmithDraftResolution): void {
+    this.lastDraftResolution = { ...resolution };
+  }
+
+  isBusy(): boolean {
+    return this.busy;
+  }
+
+  tryStartEnhancement(): boolean {
+    if (this.busy) return false;
+    this.busy = true;
+    return true;
+  }
+
+  finishEnhancement(): void {
+    this.busy = false;
+  }
+}
+
+function getGlobalSettingsPath(): string {
+  return join(homedir(), ".pi", "agent", "promptsmith-settings.json");
+}
+
+function getLegacyProjectSettingsPath(cwd: string): string {
+  return join(cwd, ".pi", "promptsmith-settings.json");
+}
+
+function restorePersistedSettings(
+  settingsPath: string,
+  cwd: string
+): PromptsmithSettings | undefined {
+  const storedSettings = restoreSettingsFromDisk(settingsPath);
+  if (storedSettings) {
+    return storedSettings;
+  }
+
+  const legacyProjectSettings = restoreSettingsFromDisk(getLegacyProjectSettingsPath(cwd));
+  if (!legacyProjectSettings) {
+    return undefined;
+  }
+
+  try {
+    writeSettingsToDisk(settingsPath, legacyProjectSettings);
+  } catch {}
+
+  return legacyProjectSettings;
+}
+
+function restoreSettingsFromDisk(path: string): PromptsmithSettings | undefined {
+  try {
+    const raw = readFileSync(path, "utf8");
+    return sanitizeSettings(JSON.parse(raw));
+  } catch {
+    return undefined;
+  }
+}
+
+export function sanitizeSettings(value: unknown): PromptsmithSettings | undefined {
+  if (!isRecord(value)) return undefined;
+  if (value.version !== DEFAULT_SETTINGS.version) return undefined;
+
+  const fixedEnhancerModel = sanitizeModelRef(value.fixedEnhancerModel);
+  const familyEnhancerModels = sanitizeFamilyEnhancerModels(value.familyEnhancerModels);
+
+  return {
+    version: DEFAULT_SETTINGS.version,
+    enabled: readBoolean(value.enabled, DEFAULT_SETTINGS.enabled),
+    shortcutEnabled: readBoolean(value.shortcutEnabled, DEFAULT_SETTINGS.shortcutEnabled),
+    targetFamilyMode: readTargetFamilyMode(value.targetFamilyMode),
+    fallbackFamily: readFamily(value.fallbackFamily, DEFAULT_SETTINGS.fallbackFamily),
+    exactModelOverrides: sanitizeExactOverrides(value.exactModelOverrides),
+    familyOverrides: sanitizeFamilyOverrides(value.familyOverrides),
+    enhancerModelMode: readEnhancerModelMode(value.enhancerModelMode),
+    ...(fixedEnhancerModel ? { fixedEnhancerModel } : {}),
+    ...(familyEnhancerModels ? { familyEnhancerModels } : {}),
+    includeRecentConversation: readBoolean(
+      value.includeRecentConversation,
+      DEFAULT_SETTINGS.includeRecentConversation
+    ),
+    includeProjectMetadata: readBoolean(
+      value.includeProjectMetadata,
+      DEFAULT_SETTINGS.includeProjectMetadata
+    ),
+    statusBarEnabled: readBoolean(value.statusBarEnabled, DEFAULT_SETTINGS.statusBarEnabled),
+    rewriteStrength: readRewriteStrength(value.rewriteStrength),
+    rewriteMode: readRewriteMode(value.rewriteMode),
+    previewBeforeReplace: readBoolean(
+      value.previewBeforeReplace,
+      DEFAULT_SETTINGS.previewBeforeReplace
+    ),
+    preserveCodeBlocks: readBoolean(value.preserveCodeBlocks, DEFAULT_SETTINGS.preserveCodeBlocks),
+    enhancementTimeoutMs: readEnhancementTimeoutMs(value.enhancementTimeoutMs),
+  };
+}
+
+export function cloneSettings(settings: PromptsmithSettings): PromptsmithSettings {
+  return {
+    ...settings,
+    exactModelOverrides: settings.exactModelOverrides.map((entry) => ({ ...entry })),
+    familyOverrides: settings.familyOverrides.map((entry) => ({ ...entry })),
+    ...(settings.fixedEnhancerModel
+      ? { fixedEnhancerModel: { ...settings.fixedEnhancerModel } }
+      : {}),
+    ...(settings.familyEnhancerModels
+      ? {
+          familyEnhancerModels: {
+            ...(settings.familyEnhancerModels.gpt
+              ? { gpt: { ...settings.familyEnhancerModels.gpt } }
+              : {}),
+            ...(settings.familyEnhancerModels.claude
+              ? { claude: { ...settings.familyEnhancerModels.claude } }
+              : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+function writeSettingsToDisk(path: string, settings: PromptsmithSettings): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+}
+
+function sanitizeExactOverrides(value: unknown): ExactModelOverride[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!isRecord(entry)) return [];
+    const ref = sanitizeModelRef(entry);
+    const family = readFamily(entry.family, undefined);
+    return ref && family ? [{ ...ref, family }] : [];
+  });
+}
+
+function sanitizeFamilyOverrides(value: unknown): FamilyOverride[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!isRecord(entry)) return [];
+    const family = readFamily(entry.family, undefined);
+    const pattern = typeof entry.pattern === "string" ? entry.pattern.trim() : "";
+    return family && pattern ? [{ pattern, family }] : [];
+  });
+}
+
+function sanitizeModelRef(value: unknown): ModelRef | undefined {
+  if (!isRecord(value)) return undefined;
+  const provider = typeof value.provider === "string" ? value.provider.trim() : "";
+  const id = typeof value.id === "string" ? value.id.trim() : "";
+  if (!provider || !id) return undefined;
+  return { provider, id };
+}
+
+function sanitizeFamilyEnhancerModels(value: unknown): FamilyEnhancerModels | undefined {
+  if (!isRecord(value)) return undefined;
+  const gpt = sanitizeModelRef(value.gpt);
+  const claude = sanitizeModelRef(value.claude);
+  if (!gpt && !claude) return undefined;
+  return {
+    ...(gpt ? { gpt } : {}),
+    ...(claude ? { claude } : {}),
+  };
+}
+
+function readBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function readFamily<TFallback extends string | undefined>(
+  value: unknown,
+  fallback: TFallback
+): "gpt" | "claude" | TFallback {
+  return value === "gpt" || value === "claude" ? value : fallback;
+}
+
+function readTargetFamilyMode(value: unknown): PromptsmithSettings["targetFamilyMode"] {
+  return value === "auto" || value === "gpt" || value === "claude"
+    ? value
+    : DEFAULT_SETTINGS.targetFamilyMode;
+}
+
+function readEnhancerModelMode(value: unknown): PromptsmithSettings["enhancerModelMode"] {
+  return value === "active" || value === "fixed" || value === "family-linked"
+    ? value
+    : DEFAULT_SETTINGS.enhancerModelMode;
+}
+
+function readRewriteStrength(value: unknown): PromptsmithSettings["rewriteStrength"] {
+  return value === "light" || value === "balanced" || value === "strong"
+    ? value
+    : DEFAULT_SETTINGS.rewriteStrength;
+}
+
+function readRewriteMode(value: unknown): PromptsmithSettings["rewriteMode"] {
+  return value === "auto" || value === "plain" || value === "execution-contract"
+    ? value
+    : DEFAULT_SETTINGS.rewriteMode;
+}
+
+function readEnhancementTimeoutMs(value: unknown): number {
+  if (!Number.isInteger(value)) {
+    return DEFAULT_ENHANCEMENT_TIMEOUT_MS;
+  }
+
+  const timeoutMs = Number(value);
+  if (timeoutMs < MIN_ENHANCEMENT_TIMEOUT_MS || timeoutMs > MAX_ENHANCEMENT_TIMEOUT_MS) {
+    return DEFAULT_ENHANCEMENT_TIMEOUT_MS;
+  }
+
+  return timeoutMs;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}

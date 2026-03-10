@@ -1,31 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import extensionTemplate from "../src/index.js";
-import { EXTENSION_COMMAND, TOOL_NAME } from "../src/constants.js";
+import { EXTENSION_COMMAND, SHORTCUT_KEY } from "../src/constants.js";
+import { createPromptsmithExtension } from "../src/index.js";
+import { createMockPi } from "./helpers.js";
 
-interface CapturedExtension {
-  commandName?: string;
-  toolName?: string;
-}
+void test("extension registers the promptsmith command and shortcut", () => {
+  const harness = createMockPi();
 
-function createMockPi(captured: CapturedExtension): ExtensionAPI {
-  return {
-    on: () => undefined,
-    registerCommand: (name: string) => {
-      captured.commandName = name;
-    },
-    registerTool: (tool: { name: string }) => {
-      captured.toolName = tool.name;
-    },
-    appendEntry: () => undefined,
-  } as unknown as ExtensionAPI;
-}
+  createPromptsmithExtension(harness.pi);
 
-void test("extension registers command and tool", () => {
-  const captured: CapturedExtension = {};
-  extensionTemplate(createMockPi(captured));
-
-  assert.equal(captured.commandName, EXTENSION_COMMAND);
-  assert.equal(captured.toolName, TOOL_NAME);
+  assert.ok(harness.commands.has(EXTENSION_COMMAND));
+  assert.ok(harness.shortcuts.has(SHORTCUT_KEY));
+  assert.ok(!("toolName" in harness));
 });
