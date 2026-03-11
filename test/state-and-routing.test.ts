@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveEnhancerModel } from "../src/model-selection.js";
 import { matchesPattern, resolveTargetFamily } from "../src/model-routing.js";
+import { upsertExactModelOverride } from "../src/overrides.js";
 import { PromptsmithRuntimeState, sanitizeSettings } from "../src/state.js";
 import { detectRuntimeSupport } from "../src/validation.js";
 import { createCommandContext, createModel, createRuntimeState } from "./helpers.js";
@@ -12,7 +13,7 @@ import { createCommandContext, createModel, createRuntimeState } from "./helpers
 void test("target family resolution honors exact overrides and pattern overrides", () => {
   const settings = {
     ...createRuntimeState().getSettings(),
-    exactModelOverrides: [{ provider: "openai", id: "gpt-5", family: "claude" as const }],
+    exactModelOverrides: [{ provider: "OpenAI", id: "GPT-5", family: "claude" as const }],
     familyOverrides: [{ pattern: "moonshot/*", family: "claude" as const }],
   };
 
@@ -42,6 +43,21 @@ void test("target family resolution falls back to built-in defaults and fallback
     ).family,
     "claude"
   );
+});
+
+void test("upsertExactModelOverride replaces case-variant duplicates", () => {
+  const next = upsertExactModelOverride(
+    {
+      ...createRuntimeState().getSettings(),
+      exactModelOverrides: [{ provider: "OpenAI", id: "GPT-5", family: "gpt" as const }],
+    },
+    { provider: "openai", id: "gpt-5" },
+    "claude"
+  );
+
+  assert.deepEqual(next.exactModelOverrides, [
+    { provider: "openai", id: "gpt-5", family: "claude" },
+  ]);
 });
 
 void test("matchesPattern supports provider and raw model-id globs", () => {

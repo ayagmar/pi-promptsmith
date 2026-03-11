@@ -1,3 +1,4 @@
+import { normalize } from "./model-routing.js";
 import type { ModelRef, PromptsmithFamily, PromptsmithSettings } from "./types.js";
 
 export function upsertExactModelOverride(
@@ -9,7 +10,11 @@ export function upsertExactModelOverride(
     ...settings,
     exactModelOverrides: [
       ...settings.exactModelOverrides.filter(
-        (entry) => !(entry.provider === modelRef.provider && entry.id === modelRef.id)
+        (entry) =>
+          !(
+            normalize(entry.provider) === normalize(modelRef.provider) &&
+            normalize(entry.id) === normalize(modelRef.id)
+          )
       ),
       { ...modelRef, family },
     ],

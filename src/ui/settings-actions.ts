@@ -2,6 +2,7 @@ import type { Api, Model } from "@mariozechner/pi-ai";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { DEFAULT_SETTINGS } from "../constants.js";
 import { parseModelRef } from "../model-selection.js";
+import { normalize } from "../model-routing.js";
 import { upsertExactModelOverride } from "../overrides.js";
 import { cloneSettings } from "../state.js";
 import type { PromptsmithRuntimeState } from "../state.js";
@@ -375,7 +376,11 @@ async function manageExactOverrides(
             const next = {
               ...settings,
               exactModelOverrides: settings.exactModelOverrides.filter(
-                (entry) => !(entry.provider === modelRef.provider && entry.id === modelRef.id)
+                (entry) =>
+                  !(
+                    normalize(entry.provider) === normalize(modelRef.provider) &&
+                    normalize(entry.id) === normalize(modelRef.id)
+                  )
               ),
             };
             persistSettings(ctx, runtime, services, next, `Removed the rule for ${modelText}.`);

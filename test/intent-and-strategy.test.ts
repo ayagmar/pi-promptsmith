@@ -146,7 +146,7 @@ void test("buildPromptContext caps the safe input budget to the enhancer model u
   await assert.rejects(
     buildPromptContext({
       ctx,
-      draft: "Tiny prompt",
+      draft: "x".repeat(20_000),
       settings: runtime.getSettings(),
       activeModel: model,
       targetFamily: "gpt",

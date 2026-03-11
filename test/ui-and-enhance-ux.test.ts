@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { handlePromptsmithCommand } from "../src/commands.js";
+import { runSettingsAction } from "../src/ui/settings-actions.js";
 import { openSelectDialog } from "../src/ui/select-dialog.js";
 import {
   createAssistantResponse,
@@ -107,6 +108,41 @@ void test("custom ui mock waits for async done callbacks before resolving", asyn
   });
 
   assert.equal(result, "done");
+});
+
+void test("exact override removal clears case-variant duplicates", async () => {
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    exactModelOverrides: [
+      { provider: "OpenAI", id: "GPT-5", family: "claude" },
+      { provider: "openai", id: "gpt-5", family: "gpt" },
+      { provider: "anthropic", id: "claude-3-5-sonnet", family: "claude" },
+    ],
+  });
+
+  const ctx = createCommandContext();
+  const selections = ["Remove rule", "OpenAI/GPT-5 → claude", undefined];
+  Object.assign(ctx.ui, {
+    custom: (_factory: unknown) => Promise.resolve(selections.shift()),
+  });
+
+  let refreshCount = 0;
+  await runSettingsAction("exactModelOverrides", {
+    ctx,
+    runtime,
+    services: {
+      refreshStatus: () => {
+        refreshCount += 1;
+      },
+    },
+    settings: runtime.getSettings(),
+  });
+
+  assert.deepEqual(runtime.getSettings().exactModelOverrides, [
+    { provider: "anthropic", id: "claude-3-5-sonnet", family: "claude" },
+  ]);
+  assert.equal(refreshCount, 1);
 });
 
 void test("enhancement retries once when the first model response breaks the sentinel contract", async () => {
