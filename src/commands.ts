@@ -1,8 +1,17 @@
 import type { ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
 import { HELP_LINES } from "./constants.js";
+import {
+  setActiveEnhancerModelMode,
+  setFamilyEnhancerModel,
+  setFixedEnhancerModel,
+} from "./enhancer-settings.js";
 import { enhanceEditorDraft, type EnhancementServices } from "./enhance.js";
 import { parseModelRef } from "./model-selection.js";
-import { upsertExactModelOverride } from "./overrides.js";
+import {
+  removeFamilyOverride,
+  upsertExactModelOverride,
+  upsertFamilyOverride,
+} from "./overrides.js";
 import type { PromptsmithRuntimeState } from "./state.js";
 import type {
   ParsedPromptsmithCommand,
@@ -263,7 +272,7 @@ function handleEnhancerModelCommand(
         ctx,
         runtime,
         services,
-        { ...settings, enhancerModelMode: "active" },
+        setActiveEnhancerModelMode(settings),
         "Enhancer model mode set to active."
       );
       return;
@@ -276,7 +285,7 @@ function handleEnhancerModelCommand(
         ctx,
         runtime,
         services,
-        { ...settings, enhancerModelMode: "fixed", fixedEnhancerModel: modelRef },
+        setFixedEnhancerModel(settings, modelRef),
         `Fixed enhancer model set to ${modelRef.provider}/${modelRef.id}.`
       );
       return;
@@ -289,17 +298,12 @@ function handleEnhancerModelCommand(
           "Usage: /promptsmith enhancer-model family-linked <gpt-provider>/<gpt-id> <claude-provider>/<claude-id>"
         );
       }
-      persistSettings(
-        ctx,
-        runtime,
-        services,
-        {
-          ...settings,
-          enhancerModelMode: "family-linked",
-          familyEnhancerModels: { gpt: gptModel, claude: claudeModel },
-        },
-        "Family-linked enhancer models updated."
+      const next = setFamilyEnhancerModel(
+        setFamilyEnhancerModel(settings, "gpt", gptModel),
+        "claude",
+        claudeModel
       );
+      persistSettings(ctx, runtime, services, next, "Family-linked enhancer models updated.");
       return;
     }
     default:
@@ -363,13 +367,7 @@ function handleMapCommand(
       if (!pattern || !family) {
         throw new Error("Usage: /promptsmith map add <pattern> <gpt|claude>");
       }
-      const next = {
-        ...settings,
-        familyOverrides: [
-          ...settings.familyOverrides.filter((entry) => entry.pattern !== pattern),
-          { pattern, family },
-        ],
-      };
+      const next = upsertFamilyOverride(settings, pattern, family);
       persistSettings(ctx, runtime, services, next, `Pattern ${pattern} now routes to ${family}.`);
       return;
     }
@@ -378,10 +376,7 @@ function handleMapCommand(
       if (!pattern) {
         throw new Error("Usage: /promptsmith map remove <pattern>");
       }
-      const next = {
-        ...settings,
-        familyOverrides: settings.familyOverrides.filter((entry) => entry.pattern !== pattern),
-      };
+      const next = removeFamilyOverride(settings, pattern);
       persistSettings(ctx, runtime, services, next, `Removed pattern override ${pattern}.`);
       return;
     }

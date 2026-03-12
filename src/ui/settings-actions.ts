@@ -1,9 +1,21 @@
 import type { Api, Model } from "@mariozechner/pi-ai";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { DEFAULT_SETTINGS } from "../constants.js";
+import {
+  clearFamilyEnhancerModel,
+  clearFixedEnhancerModel,
+  setActiveEnhancerModelMode,
+  setFamilyEnhancerModel,
+  setFixedEnhancerModel,
+} from "../enhancer-settings.js";
 import { parseModelRef } from "../model-selection.js";
 import { normalize } from "../model-routing.js";
-import { upsertExactModelOverride } from "../overrides.js";
+import {
+  removeExactModelOverride,
+  removeFamilyOverride,
+  upsertExactModelOverride,
+  upsertFamilyOverride,
+} from "../overrides.js";
 import { cloneSettings } from "../state.js";
 import type { PromptsmithRuntimeState } from "../state.js";
 import type { ModelRef, PromptsmithFamily, PromptsmithSettings } from "../types.js";
@@ -115,20 +127,25 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          (latest) => ({ ...latest, enhancerModelMode: nextMode }),
+          (latest) =>
+            nextMode === "active"
+              ? setActiveEnhancerModelMode(latest)
+              : { ...latest, enhancerModelMode: nextMode },
           `Enhancer model choice set to ${nextMode}.`
         );
       }
       return;
     }
     case "fixedEnhancerModel": {
-      const modelRef = await chooseModelRef(ctx, "Choose the fixed enhancer model");
+      const modelRef = await chooseModelRef(ctx, "Choose the fixed enhancer model", {
+        allowClear: true,
+      });
       if (modelRef === null) {
         persistSettings(
           ctx,
           runtime,
           services,
-          (latest) => removeFixedEnhancerModel(latest),
+          (latest) => clearFixedEnhancerModel(latest),
           "Fixed enhancer model cleared."
         );
       } else if (modelRef) {
@@ -136,20 +153,22 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          (latest) => ({ ...latest, fixedEnhancerModel: modelRef }),
+          (latest) => setFixedEnhancerModel(latest, modelRef),
           `Fixed enhancer model set to ${modelRef.provider}/${modelRef.id}.`
         );
       }
       return;
     }
     case "gptEnhancerModel": {
-      const modelRef = await chooseModelRef(ctx, "Choose the model used for GPT-style rewrites");
+      const modelRef = await chooseModelRef(ctx, "Choose the model used for GPT-style rewrites", {
+        allowClear: true,
+      });
       if (modelRef === null) {
         persistSettings(
           ctx,
           runtime,
           services,
-          (latest) => updateFamilyEnhancerModel(latest, "gpt", undefined),
+          (latest) => clearFamilyEnhancerModel(latest, "gpt"),
           "GPT-style enhancer model cleared."
         );
       } else if (modelRef) {
@@ -157,20 +176,26 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          (latest) => updateFamilyEnhancerModel(latest, "gpt", modelRef),
+          (latest) => setFamilyEnhancerModel(latest, "gpt", modelRef),
           `GPT-style enhancer model set to ${modelRef.provider}/${modelRef.id}.`
         );
       }
       return;
     }
     case "claudeEnhancerModel": {
-      const modelRef = await chooseModelRef(ctx, "Choose the model used for Claude-style rewrites");
+      const modelRef = await chooseModelRef(
+        ctx,
+        "Choose the model used for Claude-style rewrites",
+        {
+          allowClear: true,
+        }
+      );
       if (modelRef === null) {
         persistSettings(
           ctx,
           runtime,
           services,
-          (latest) => updateFamilyEnhancerModel(latest, "claude", undefined),
+          (latest) => clearFamilyEnhancerModel(latest, "claude"),
           "Claude-style enhancer model cleared."
         );
       } else if (modelRef) {
@@ -178,7 +203,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          (latest) => updateFamilyEnhancerModel(latest, "claude", modelRef),
+          (latest) => setFamilyEnhancerModel(latest, "claude", modelRef),
           `Claude-style enhancer model set to ${modelRef.provider}/${modelRef.id}.`
         );
       }
@@ -370,34 +395,25 @@ async function manageExactOverrides(
         break;
       }
       case "Remove rule": {
-        const exactRuleOptions = settings.exactModelOverrides.map(
-          (entry) => `${entry.provider}/${entry.id} → ${entry.family}`
-        );
+        const exactRuleOptions = settings.exactModelOverrides.map((entry) => ({
+          label: `${entry.provider}/${entry.id} → ${entry.family}`,
+          value: `${entry.provider}/${entry.id}`,
+        }));
         const selected = await selectOption(ctx, "Remove exact model style rule", exactRuleOptions);
         if (selected) {
-          const [modelText] = selected.split(" → ");
-          if (!modelText) {
+          const selectedEntry = settings.exactModelOverrides.find(
+            (entry) => normalize(`${entry.provider}/${entry.id}`) === normalize(selected)
+          );
+          if (!selectedEntry) {
             break;
           }
-          const modelRef = parseModelRef(modelText);
-          if (modelRef) {
-            persistSettings(
-              ctx,
-              runtime,
-              services,
-              (latest) => ({
-                ...latest,
-                exactModelOverrides: latest.exactModelOverrides.filter(
-                  (entry) =>
-                    !(
-                      normalize(entry.provider) === normalize(modelRef.provider) &&
-                      normalize(entry.id) === normalize(modelRef.id)
-                    )
-                ),
-              }),
-              `Removed the rule for ${modelText}.`
-            );
-          }
+          persistSettings(
+            ctx,
+            runtime,
+            services,
+            (latest) => removeExactModelOverride(latest, selectedEntry),
+            `Removed the rule for ${selected}.`
+          );
         }
         break;
       }
@@ -458,13 +474,7 @@ async function managePatternOverrides(
           ctx,
           runtime,
           services,
-          (latest) => ({
-            ...latest,
-            familyOverrides: [
-              ...latest.familyOverrides.filter((entry) => entry.pattern !== trimmedPattern),
-              { pattern: trimmedPattern, family },
-            ],
-          }),
+          (latest) => upsertFamilyOverride(latest, trimmedPattern, family),
           `Pattern ${trimmedPattern} now routes to ${family}.`
         );
         break;
@@ -480,10 +490,7 @@ async function managePatternOverrides(
             ctx,
             runtime,
             services,
-            (latest) => ({
-              ...latest,
-              familyOverrides: latest.familyOverrides.filter((entry) => entry.pattern !== selected),
-            }),
+            (latest) => removeFamilyOverride(latest, selected),
             `Removed the rule ${selected}.`
           );
         }
@@ -495,50 +502,10 @@ async function managePatternOverrides(
   }
 }
 
-function updateFamilyEnhancerModel(
-  settings: PromptsmithSettings,
-  family: PromptsmithFamily,
-  modelRef: ModelRef | undefined
-): PromptsmithSettings {
-  const current = settings.familyEnhancerModels ?? {};
-  const nextFamilyModels = { ...current };
-
-  if (family === "gpt") {
-    if (modelRef) {
-      nextFamilyModels.gpt = modelRef;
-    } else {
-      delete nextFamilyModels.gpt;
-    }
-  }
-
-  if (family === "claude") {
-    if (modelRef) {
-      nextFamilyModels.claude = modelRef;
-    } else {
-      delete nextFamilyModels.claude;
-    }
-  }
-
-  return Object.keys(nextFamilyModels).length > 0
-    ? { ...settings, familyEnhancerModels: nextFamilyModels }
-    : removeFamilyEnhancerModels(settings);
-}
-
-function removeFixedEnhancerModel(settings: PromptsmithSettings): PromptsmithSettings {
-  const next = { ...settings };
-  delete next.fixedEnhancerModel;
-  return next;
-}
-
-function removeFamilyEnhancerModels(settings: PromptsmithSettings): PromptsmithSettings {
-  const next = { ...settings };
-  delete next.familyEnhancerModels;
-  return next;
-}
-
 async function chooseModelRef(
   ctx: ExtensionContext,
-  title: string
+  title: string,
+  options?: { allowClear?: boolean }
 ): Promise<ModelRef | null | undefined> {
   const models = ctx.modelRegistry
     .getAll()
@@ -550,7 +517,9 @@ async function chooseModelRef(
   const selection = await openSelectDialog(ctx, {
     title,
     items: [
-      { value: "Clear", label: "Clear", description: "Remove the saved model selection" },
+      ...(options?.allowClear
+        ? [{ value: "Clear", label: "Clear", description: "Remove the saved model selection" }]
+        : []),
       { value: "Manual entry", label: "Manual entry", description: "Type provider/model-id" },
       ...models.map((model) => {
         const description = buildModelDescription(ctx, model);

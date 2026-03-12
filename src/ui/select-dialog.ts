@@ -108,7 +108,7 @@ class CompactSelectDialog implements Component, Focusable {
   }
 
   render(width: number): string[] {
-    const lines = [this.theme.fg("accent", this.theme.bold(this.title))];
+    const lines = [this.theme.fg("accent", truncateToWidth(this.theme.bold(this.title), width))];
 
     if (
       this.searchable &&

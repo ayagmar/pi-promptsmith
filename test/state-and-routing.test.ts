@@ -1,11 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolveEnhancerModel } from "../src/model-selection.js";
 import { matchesPattern, resolveTargetFamily } from "../src/model-routing.js";
-import { upsertExactModelOverride } from "../src/overrides.js";
+import {
+  removeExactModelOverride,
+  removeFamilyOverride,
+  upsertExactModelOverride,
+  upsertFamilyOverride,
+} from "../src/overrides.js";
 import { PromptsmithRuntimeState, sanitizeSettings } from "../src/state.js";
 import { detectRuntimeSupport } from "../src/validation.js";
 import { createCommandContext, createModel, createRuntimeState } from "./helpers.js";
@@ -60,6 +65,53 @@ void test("upsertExactModelOverride replaces case-variant duplicates", () => {
   ]);
 });
 
+void test("removeExactModelOverride clears case-variant duplicates", () => {
+  const next = removeExactModelOverride(
+    {
+      ...createRuntimeState().getSettings(),
+      exactModelOverrides: [
+        { provider: "OpenAI", id: "GPT-5", family: "gpt" as const },
+        { provider: "openai", id: "gpt-5", family: "claude" as const },
+        { provider: "anthropic", id: "claude-3-5-sonnet", family: "claude" as const },
+      ],
+    },
+    { provider: "openai", id: "gpt-5" }
+  );
+
+  assert.deepEqual(next.exactModelOverrides, [
+    { provider: "anthropic", id: "claude-3-5-sonnet", family: "claude" },
+  ]);
+});
+
+void test("upsertFamilyOverride replaces case-variant duplicate patterns", () => {
+  const next = upsertFamilyOverride(
+    {
+      ...createRuntimeState().getSettings(),
+      familyOverrides: [{ pattern: "OpenAI/*", family: "gpt" as const }],
+    },
+    "openai/*",
+    "claude"
+  );
+
+  assert.deepEqual(next.familyOverrides, [{ pattern: "openai/*", family: "claude" }]);
+});
+
+void test("removeFamilyOverride clears case-variant duplicate patterns", () => {
+  const next = removeFamilyOverride(
+    {
+      ...createRuntimeState().getSettings(),
+      familyOverrides: [
+        { pattern: "OpenAI/*", family: "gpt" as const },
+        { pattern: "openai/*", family: "claude" as const },
+        { pattern: "moonshot/*", family: "claude" as const },
+      ],
+    },
+    "openai/*"
+  );
+
+  assert.deepEqual(next.familyOverrides, [{ pattern: "moonshot/*", family: "claude" }]);
+});
+
 void test("matchesPattern supports provider and raw model-id globs", () => {
   assert.equal(matchesPattern("openai/*", "openai/gpt-5", "gpt-5"), true);
   assert.equal(matchesPattern("kimi-*", "moonshot/kimi-k2", "kimi-k2"), true);
@@ -109,7 +161,6 @@ void test("settings persist across sessions globally", () => {
   const storageDir = mkdtempSync(join(tmpdir(), "promptsmith-state-"));
   const settingsPath = join(storageDir, "promptsmith-settings.json");
   const runtime = new PromptsmithRuntimeState(settingsPath);
-  const ctx = createCommandContext();
 
   runtime.persistSettings({
     ...runtime.getSettings(),
@@ -120,43 +171,12 @@ void test("settings persist across sessions globally", () => {
   });
 
   const restoredRuntime = new PromptsmithRuntimeState(settingsPath);
-  restoredRuntime.restoreSettings(ctx.cwd);
+  restoredRuntime.restoreSettings();
 
   assert.equal(restoredRuntime.getSettings().enabled, false);
   assert.equal(restoredRuntime.getSettings().statusBarEnabled, true);
   assert.equal(restoredRuntime.getSettings().rewriteMode, "plain");
   assert.equal(restoredRuntime.getSettings().enhancementTimeoutMs, 12_000);
-});
-
-void test("legacy local settings migrate to global storage", () => {
-  const storageDir = mkdtempSync(join(tmpdir(), "promptsmith-state-"));
-  const settingsPath = join(storageDir, "promptsmith-settings.json");
-  const projectDir = mkdtempSync(join(tmpdir(), "promptsmith-project-"));
-  const legacyDir = join(projectDir, ".pi");
-  mkdirSync(legacyDir, { recursive: true });
-  writeFileSync(
-    join(legacyDir, "promptsmith-settings.json"),
-    `${JSON.stringify({
-      version: 1,
-      enabled: false,
-      statusBarEnabled: true,
-      rewriteMode: "plain",
-      enhancementTimeoutMs: 12_000,
-    })}\n`,
-    "utf8"
-  );
-
-  const runtime = new PromptsmithRuntimeState(settingsPath);
-  const restored = runtime.restoreSettings(projectDir);
-
-  assert.equal(restored.settings.enabled, false);
-  assert.equal(restored.settings.statusBarEnabled, true);
-  assert.equal(restored.settings.rewriteMode, "plain");
-
-  const restoredRuntime = new PromptsmithRuntimeState(settingsPath);
-  restoredRuntime.restoreSettings(mkdtempSync(join(tmpdir(), "other-project-")));
-  assert.equal(restoredRuntime.getSettings().enabled, false);
-  assert.equal(restoredRuntime.getSettings().statusBarEnabled, true);
 });
 
 void test("failed global settings writes do not claim success or corrupt runtime state", () => {
@@ -179,6 +199,32 @@ void test("failed global settings writes do not claim success or corrupt runtime
 
 void test("sanitizeSettings rejects unknown schema versions", () => {
   assert.equal(sanitizeSettings({ version: 2 }), undefined);
+});
+
+void test("sanitizeSettings dedupes exact and pattern overrides by normalized key", () => {
+  const sanitized = sanitizeSettings({
+    version: 1,
+    exactModelOverrides: [
+      { provider: "OpenAI", id: "GPT-5", family: "gpt" },
+      { provider: "openai", id: "gpt-5", family: "claude" },
+      { provider: "anthropic", id: "claude-3-5-sonnet", family: "claude" },
+    ],
+    familyOverrides: [
+      { pattern: "OpenAI/*", family: "gpt" },
+      { pattern: "moonshot/*", family: "claude" },
+      { pattern: "openai/*", family: "claude" },
+    ],
+  });
+
+  assert.ok(sanitized);
+  assert.deepEqual(sanitized.exactModelOverrides, [
+    { provider: "openai", id: "gpt-5", family: "claude" },
+    { provider: "anthropic", id: "claude-3-5-sonnet", family: "claude" },
+  ]);
+  assert.deepEqual(sanitized.familyOverrides, [
+    { pattern: "moonshot/*", family: "claude" },
+    { pattern: "openai/*", family: "claude" },
+  ]);
 });
 
 void test("runtime support relies on hasUI instead of theme enumeration", () => {
@@ -210,7 +256,7 @@ void test("runtime restore clears transient undo state", () => {
     effectiveRewriteMode: "execution-contract",
   });
 
-  runtime.restoreSettings(createCommandContext().cwd);
+  runtime.restoreSettings();
 
   assert.equal(runtime.undo.hasUndo(), false);
   assert.equal(runtime.getLastDraftResolution(), undefined);

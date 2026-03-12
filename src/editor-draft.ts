@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 
 interface PasteMarker {
@@ -12,6 +13,14 @@ interface ClipboardCommand {
 }
 
 const PASTE_MARKER_REGEX = /\[paste #\d+(?: (?:\+(\d+) lines|(\d+) chars))?\]/g;
+const WINDOWS_CLIPBOARD_COMMAND: ClipboardCommand = {
+  command: "powershell.exe",
+  args: [
+    "-NoProfile",
+    "-Command",
+    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard -Raw",
+  ],
+};
 
 export async function resolveEditorDraft(
   ctx: ExtensionContext,
@@ -22,6 +31,9 @@ export async function resolveEditorDraft(
   if (markers.length === 0) {
     return draft;
   }
+  if (markers.length > 1) {
+    throw new Error(unresolvedPasteMarkerMessage());
+  }
 
   const clipboardText = await readClipboardText(exec);
   const clipboardCandidates = buildClipboardCandidates(clipboardText);
@@ -29,21 +41,15 @@ export async function resolveEditorDraft(
     throw new Error(unresolvedPasteMarkerMessage());
   }
 
-  let resolved = draft;
-  for (const marker of markers) {
-    const matchingClipboard = clipboardCandidates.find((candidate) =>
-      matchesPasteMarker(candidate, marker)
-    );
-    if (matchingClipboard) {
-      resolved = resolved.replaceAll(marker.raw, matchingClipboard);
-    }
-  }
-
-  if (extractPasteMarkers(resolved).length > 0) {
+  const marker = markers[0]!;
+  const matchingClipboard = clipboardCandidates.find((candidate) =>
+    matchesPasteMarker(candidate, marker)
+  );
+  if (!matchingClipboard) {
     throw new Error(unresolvedPasteMarkerMessage());
   }
 
-  return resolved;
+  return draft.replaceAll(marker.raw, matchingClipboard);
 }
 
 function extractPasteMarkers(text: string): PasteMarker[] {
@@ -99,20 +105,15 @@ function getClipboardReadCommands(): ClipboardCommand[] {
   }
 
   if (process.platform === "win32") {
-    return [
-      {
-        command: "powershell.exe",
-        args: [
-          "-NoProfile",
-          "-Command",
-          "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Get-Clipboard -Raw",
-        ],
-      },
-    ];
+    return [WINDOWS_CLIPBOARD_COMMAND];
   }
 
   const commands: ClipboardCommand[] = [];
-  if (process.env.TERMUX_VERSION || process.env.ANDROID_ROOT) {
+  const isTermux = Boolean(process.env.TERMUX_VERSION || process.env.ANDROID_ROOT);
+  if (isWslEnvironment()) {
+    commands.push(WINDOWS_CLIPBOARD_COMMAND);
+  }
+  if (isTermux) {
     commands.push({ command: "termux-clipboard-get", args: [] });
   }
   commands.push(
@@ -120,10 +121,25 @@ function getClipboardReadCommands(): ClipboardCommand[] {
     { command: "xclip", args: ["-selection", "clipboard", "-o"] },
     { command: "xsel", args: ["--clipboard", "--output"] }
   );
-  if (!commands.some((entry) => entry.command === "termux-clipboard-get")) {
+  if (!isTermux) {
     commands.push({ command: "termux-clipboard-get", args: [] });
   }
   return commands;
+}
+
+function isWslEnvironment(): boolean {
+  if (process.platform !== "linux") {
+    return false;
+  }
+  if (process.env.WSL_DISTRO_NAME || process.env.WSLENV) {
+    return true;
+  }
+
+  try {
+    return /microsoft/i.test(readFileSync("/proc/version", "utf8"));
+  } catch {
+    return false;
+  }
 }
 
 function unresolvedPasteMarkerMessage(): string {

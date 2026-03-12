@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { visibleWidth } from "@mariozechner/pi-tui";
 import { handlePromptsmithCommand } from "../src/commands.js";
+import { resolveEditorDraft } from "../src/editor-draft.js";
 import { runSettingsAction } from "../src/ui/settings-actions.js";
 import { openSelectDialog } from "../src/ui/select-dialog.js";
 import {
@@ -110,21 +112,274 @@ void test("custom ui mock waits for async done callbacks before resolving", asyn
   assert.equal(result, "done");
 });
 
-void test("exact override removal clears case-variant duplicates", async () => {
+void test("select dialog truncates long titles to the available width", async () => {
+  const ctx = createCommandContext();
+  let renderedLines: string[] = [];
+
+  Object.assign(ctx.ui, {
+    custom: (factory: unknown) => {
+      const component =
+        typeof factory === "function"
+          ? (
+              factory as (
+                tui: { requestRender: () => void },
+                theme: {
+                  fg: (color: string, text: string) => string;
+                  bg: (color: string, text: string) => string;
+                  bold: (text: string) => string;
+                },
+                keybindings: unknown,
+                done: (value: string | undefined) => void
+              ) => { render: (width: number) => string[] }
+            )(
+              { requestRender: () => undefined },
+              {
+                fg: (_color: string, text: string) => text,
+                bg: (_color: string, text: string) => text,
+                bold: (text: string) => text,
+              },
+              undefined,
+              () => undefined
+            )
+          : factory;
+
+      renderedLines = (component as { render: (width: number) => string[] }).render(12);
+      return Promise.resolve(undefined);
+    },
+  });
+
+  await openSelectDialog(ctx, {
+    title: "Promptsmith settings title that should truncate",
+    items: [{ value: "one", label: "one" }],
+  });
+
+  assert.ok(renderedLines.length > 0);
+  assert.ok(visibleWidth(renderedLines[0] ?? "") <= 12);
+});
+
+void test("resolveEditorDraft rejects multiple paste markers without reading the clipboard", async () => {
+  const ctx = createCommandContext({
+    editorText: "First [paste #1 3 chars]\nSecond [paste #2 3 chars]",
+  });
+
+  let execCalls = 0;
+  await assert.rejects(
+    () =>
+      resolveEditorDraft(ctx, () => {
+        execCalls += 1;
+        return Promise.resolve({ stdout: "abc", stderr: "", code: 0, killed: false });
+      }),
+    /Promptsmith found Pi paste markers/
+  );
+
+  assert.equal(execCalls, 0);
+});
+
+void test("resolveEditorDraft accepts clipboard text that contains marker-shaped text", async () => {
+  const ctx = createCommandContext({ editorText: "Paste here: [paste #1]" });
+
+  const resolved = await resolveEditorDraft(ctx, () =>
+    Promise.resolve({ stdout: "literal [paste #2]", stderr: "", code: 0, killed: false })
+  );
+
+  assert.equal(resolved, "Paste here: literal [paste #2]");
+});
+
+void test("resolveEditorDraft tries the Windows clipboard first on WSL", async () => {
+  const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+  const originalWslDistro = process.env.WSL_DISTRO_NAME;
+  const originalTermuxVersion = process.env.TERMUX_VERSION;
+  const originalAndroidRoot = process.env.ANDROID_ROOT;
+
+  Object.defineProperty(process, "platform", { value: "linux", configurable: true });
+  process.env.WSL_DISTRO_NAME = "Ubuntu";
+  process.env.TERMUX_VERSION = "1.0.0";
+  delete process.env.ANDROID_ROOT;
+
+  try {
+    const ctx = createCommandContext({ editorText: "Paste here: [paste #1]" });
+    const commands: string[] = [];
+
+    const resolved = await resolveEditorDraft(ctx, (command) => {
+      commands.push(command);
+      if (command === "powershell.exe") {
+        return Promise.resolve({ stdout: "", stderr: "missing", code: 1, killed: false });
+      }
+      if (command === "wl-paste") {
+        return Promise.resolve({ stdout: "clipboard text", stderr: "", code: 0, killed: false });
+      }
+      return Promise.resolve({ stdout: "", stderr: "missing", code: 1, killed: false });
+    });
+
+    assert.equal(resolved, "Paste here: clipboard text");
+    assert.deepEqual(commands.slice(0, 3), ["powershell.exe", "termux-clipboard-get", "wl-paste"]);
+    assert.equal(commands.filter((command) => command === "termux-clipboard-get").length, 1);
+  } finally {
+    if (platformDescriptor) {
+      Object.defineProperty(process, "platform", platformDescriptor);
+    }
+    if (originalWslDistro === undefined) {
+      delete process.env.WSL_DISTRO_NAME;
+    } else {
+      process.env.WSL_DISTRO_NAME = originalWslDistro;
+    }
+    if (originalTermuxVersion === undefined) {
+      delete process.env.TERMUX_VERSION;
+    } else {
+      process.env.TERMUX_VERSION = originalTermuxVersion;
+    }
+    if (originalAndroidRoot === undefined) {
+      delete process.env.ANDROID_ROOT;
+    } else {
+      process.env.ANDROID_ROOT = originalAndroidRoot;
+    }
+  }
+});
+
+void test("clearing the fixed enhancer model in fixed mode falls back to active mode", async () => {
   const runtime = createRuntimeState();
   runtime.replaceSettings({
     ...runtime.getSettings(),
+    enhancerModelMode: "fixed",
+    fixedEnhancerModel: { provider: "openai", id: "gpt-5" },
+  });
+
+  const ctx = createCommandContext();
+  const selections = ["Clear"];
+  Object.assign(ctx.ui, {
+    custom: (_factory: unknown) => Promise.resolve(selections.shift()),
+  });
+
+  await runSettingsAction("fixedEnhancerModel", {
+    ctx,
+    runtime,
+    services: {
+      refreshStatus: () => undefined,
+    },
+    settings: runtime.getSettings(),
+  });
+
+  assert.equal(runtime.getSettings().enhancerModelMode, "active");
+  assert.equal(runtime.getSettings().fixedEnhancerModel, undefined);
+});
+
+void test("exact override manual routing picker omits the Clear option", async () => {
+  const runtime = createRuntimeState();
+  const ctx = createCommandContext({ model: createModel() });
+  const selections = ["Choose model manually", undefined, undefined];
+  let modelPickerOptions: { label: string; value: string }[] = [];
+
+  Object.assign(ctx.ui, {
+    custom: (factory: unknown) => {
+      const component =
+        typeof factory === "function"
+          ? (
+              factory as (
+                tui: { requestRender: () => void },
+                theme: {
+                  fg: (color: string, text: string) => string;
+                  bg: (color: string, text: string) => string;
+                  bold: (text: string) => string;
+                },
+                keybindings: unknown,
+                done: (value: string | undefined) => void
+              ) => unknown
+            )(
+              { requestRender: () => undefined },
+              {
+                fg: (_color: string, text: string) => text,
+                bg: (_color: string, text: string) => text,
+                bold: (text: string) => text,
+              },
+              undefined,
+              () => undefined
+            )
+          : factory;
+
+      const dialog = component as {
+        title?: string;
+        allItems?: { label: string; value: string }[];
+      };
+      if (dialog.title === "Choose the model to route") {
+        modelPickerOptions = dialog.allItems?.map((item) => ({ ...item })) ?? [];
+      }
+
+      return Promise.resolve(selections.shift());
+    },
+  });
+
+  await runSettingsAction("exactModelOverrides", {
+    ctx,
+    runtime,
+    services: {
+      refreshStatus: () => undefined,
+    },
+    settings: runtime.getSettings(),
+  });
+
+  assert.equal(
+    modelPickerOptions.some((item) => item.value === "Clear"),
+    false
+  );
+  assert.equal(
+    modelPickerOptions.some((item) => item.value === "Manual entry"),
+    true
+  );
+});
+
+void test("exact override removal clears case-variant duplicates and uses the raw model ref value", async () => {
+  const runtime = createRuntimeState();
+  const modelId = "GPT-5 → preview";
+  const rawModelRef = `OpenAI/${modelId}`;
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
     exactModelOverrides: [
-      { provider: "OpenAI", id: "GPT-5", family: "claude" },
-      { provider: "openai", id: "gpt-5", family: "gpt" },
+      { provider: "OpenAI", id: modelId, family: "claude" },
+      { provider: "openai", id: "gpt-5 → preview", family: "gpt" },
       { provider: "anthropic", id: "claude-3-5-sonnet", family: "claude" },
     ],
   });
 
   const ctx = createCommandContext();
-  const selections = ["Remove rule", "OpenAI/GPT-5 → claude", undefined];
+  const selections = ["Remove rule", rawModelRef, undefined];
+  let removeRuleOptions: { label: string; value: string }[] = [];
   Object.assign(ctx.ui, {
-    custom: (_factory: unknown) => Promise.resolve(selections.shift()),
+    custom: (factory: unknown) => {
+      const component =
+        typeof factory === "function"
+          ? (
+              factory as (
+                tui: { requestRender: () => void },
+                theme: {
+                  fg: (color: string, text: string) => string;
+                  bg: (color: string, text: string) => string;
+                  bold: (text: string) => string;
+                },
+                keybindings: unknown,
+                done: (value: string | undefined) => void
+              ) => unknown
+            )(
+              { requestRender: () => undefined },
+              {
+                fg: (_color: string, text: string) => text,
+                bg: (_color: string, text: string) => text,
+                bold: (text: string) => text,
+              },
+              undefined,
+              () => undefined
+            )
+          : factory;
+
+      const dialog = component as {
+        title?: string;
+        allItems?: { label: string; value: string }[];
+      };
+      if (dialog.title === "Remove exact model style rule") {
+        removeRuleOptions = dialog.allItems?.map((item) => ({ ...item })) ?? [];
+      }
+
+      return Promise.resolve(selections.shift());
+    },
   });
 
   let refreshCount = 0;
@@ -139,6 +394,10 @@ void test("exact override removal clears case-variant duplicates", async () => {
     settings: runtime.getSettings(),
   });
 
+  assert.deepEqual(removeRuleOptions[0], {
+    label: `${rawModelRef} → claude`,
+    value: rawModelRef,
+  });
   assert.deepEqual(runtime.getSettings().exactModelOverrides, [
     { provider: "anthropic", id: "claude-3-5-sonnet", family: "claude" },
   ]);
@@ -165,13 +424,14 @@ void test("settings actions persist against the latest runtime snapshot", async 
   assert.equal(runtime.getSettings().statusBarEnabled, true);
 });
 
-void test("pattern override removal uses the raw pattern as the selected value", async () => {
+void test("pattern override removal uses the raw pattern value and clears case-variant duplicates", async () => {
   const runtime = createRuntimeState();
   const pattern = "openai/with → arrow";
   runtime.replaceSettings({
     ...runtime.getSettings(),
     familyOverrides: [
-      { pattern, family: "claude" },
+      { pattern: "OpenAI/with → arrow", family: "claude" },
+      { pattern, family: "gpt" },
       { pattern: "moonshot/*", family: "gpt" },
     ],
   });
@@ -227,8 +487,8 @@ void test("pattern override removal uses the raw pattern as the selected value",
     settings: runtime.getSettings(),
   });
 
-  assert.deepEqual(removeRuleOptions[0], {
-    label: `${pattern} → claude`,
+  assert.deepEqual(removeRuleOptions[1], {
+    label: `${pattern} → gpt`,
     value: pattern,
   });
   assert.deepEqual(runtime.getSettings().familyOverrides, [

@@ -282,6 +282,7 @@ Promptsmith keeps a few important guarantees:
 - preview mode lets you review before replace
 - only one enhancement runs at a time
 - output must contain exactly one sentinel block
+- single collapsed Pi paste markers can be recovered from the clipboard; multi-marker drafts fail closed
 - oversized drafts fail clearly instead of being truncated silently
 - intent detection is local and deterministic; it does not use a second model call
 
@@ -308,5 +309,4 @@ pi -e ./src/index.ts
 
 ## Reference docs
 
-- [`docs/PLAN.md`](./docs/PLAN.md)
-- [`docs/RESEARCH-AUGMENT-PROMPT-ENHANCER.md`](./docs/RESEARCH-AUGMENT-PROMPT-ENHANCER.md)
+This repository currently keeps its user-facing documentation in `README.md` and inline source comments/tests.

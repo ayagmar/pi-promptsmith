@@ -1,6 +1,6 @@
 import { clearTimeout, setTimeout } from "node:timers";
 import type { Api, AssistantMessage, Context, Model } from "@mariozechner/pi-ai";
-import { DEFAULT_ENHANCEMENT_TIMEOUT_MS, ENHANCER_MAX_OUTPUT_TOKENS } from "./constants.js";
+import { ENHANCER_MAX_OUTPUT_TOKENS } from "./constants.js";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { BorderedLoader } from "@mariozechner/pi-coding-agent";
 import { buildPromptContext } from "./context.js";
@@ -78,9 +78,7 @@ export async function enhanceEditorDraft(
           preparation,
           services.completeFn,
           signal,
-          services.enhancementTimeoutMs ??
-            settings.enhancementTimeoutMs ??
-            DEFAULT_ENHANCEMENT_TIMEOUT_MS
+          services.enhancementTimeoutMs ?? settings.enhancementTimeoutMs
         )
     );
 
@@ -154,21 +152,21 @@ export async function runEnhancementWithLoader(
       const loader = new BorderedLoader(tui, theme, message, { cancellable: true });
       loader.onAbort = () => done(null);
 
-      const taskPromise = task(loader.signal)
-        .then(done)
+      void task(loader.signal)
+        .then((result) => {
+          if (!loader.signal.aborted) {
+            done(result);
+          }
+        })
         .catch((error: unknown) => {
-          if (error instanceof Error) {
-            taskError = error;
+          if (loader.signal.aborted) {
             done(null);
-            throw error;
+            return;
           }
 
-          const unexpectedError = new Error("Promptsmith enhancement failed.");
-          taskError = unexpectedError;
+          taskError = error instanceof Error ? error : new Error("Promptsmith enhancement failed.");
           done(null);
-          throw unexpectedError;
         });
-      void taskPromise.catch(() => undefined);
 
       return loader;
     })

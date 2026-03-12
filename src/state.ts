@@ -7,6 +7,7 @@ import {
   MAX_ENHANCEMENT_TIMEOUT_MS,
   MIN_ENHANCEMENT_TIMEOUT_MS,
 } from "./constants.js";
+import { normalize } from "./model-routing.js";
 import type {
   ExactModelOverride,
   FamilyEnhancerModels,
@@ -14,7 +15,6 @@ import type {
   ModelRef,
   PromptsmithDraftResolution,
   PromptsmithSettings,
-  SessionRestoreResult,
 } from "./types.js";
 import { UndoManager } from "./undo.js";
 
@@ -41,13 +41,11 @@ export class PromptsmithRuntimeState {
     this.replaceSettings(nextSettings);
   }
 
-  restoreSettings(cwd: string): SessionRestoreResult {
-    const restoredSettings = restorePersistedSettings(this.settingsPath, cwd);
-    const restored = restoredSettings ?? cloneSettings(DEFAULT_SETTINGS);
-    this.replaceSettings(restored);
+  restoreSettings(): void {
+    const restoredSettings = restoreSettingsFromDisk(this.settingsPath);
+    this.replaceSettings(restoredSettings ?? cloneSettings(DEFAULT_SETTINGS));
     this.busy = false;
     this.undo.clear();
-    return { settings: this.getSettings(), restored: restoredSettings !== undefined };
   }
 
   getLastDraftResolution(): PromptsmithDraftResolution | undefined {
@@ -75,31 +73,6 @@ export class PromptsmithRuntimeState {
 
 function getGlobalSettingsPath(): string {
   return join(homedir(), ".pi", "agent", "promptsmith-settings.json");
-}
-
-function getLegacyProjectSettingsPath(cwd: string): string {
-  return join(cwd, ".pi", "promptsmith-settings.json");
-}
-
-function restorePersistedSettings(
-  settingsPath: string,
-  cwd: string
-): PromptsmithSettings | undefined {
-  const storedSettings = restoreSettingsFromDisk(settingsPath);
-  if (storedSettings) {
-    return storedSettings;
-  }
-
-  const legacyProjectSettings = restoreSettingsFromDisk(getLegacyProjectSettingsPath(cwd));
-  if (!legacyProjectSettings) {
-    return undefined;
-  }
-
-  try {
-    writeSettingsToDisk(settingsPath, legacyProjectSettings);
-  } catch {}
-
-  return legacyProjectSettings;
 }
 
 function restoreSettingsFromDisk(path: string): PromptsmithSettings | undefined {
@@ -179,22 +152,24 @@ function writeSettingsToDisk(path: string, settings: PromptsmithSettings): void 
 
 function sanitizeExactOverrides(value: unknown): ExactModelOverride[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
+  const exactOverrides = value.flatMap((entry) => {
     if (!isRecord(entry)) return [];
     const ref = sanitizeModelRef(entry);
     const family = readFamily(entry.family, undefined);
     return ref && family ? [{ ...ref, family }] : [];
   });
+  return dedupeExactOverrides(exactOverrides);
 }
 
 function sanitizeFamilyOverrides(value: unknown): FamilyOverride[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
+  const familyOverrides = value.flatMap((entry) => {
     if (!isRecord(entry)) return [];
     const family = readFamily(entry.family, undefined);
     const pattern = typeof entry.pattern === "string" ? entry.pattern.trim() : "";
     return family && pattern ? [{ pattern, family }] : [];
   });
+  return dedupeFamilyOverrides(familyOverrides);
 }
 
 function sanitizeModelRef(value: unknown): ModelRef | undefined {
@@ -203,6 +178,46 @@ function sanitizeModelRef(value: unknown): ModelRef | undefined {
   const id = typeof value.id === "string" ? value.id.trim() : "";
   if (!provider || !id) return undefined;
   return { provider, id };
+}
+
+function dedupeExactOverrides(overrides: ExactModelOverride[]): ExactModelOverride[] {
+  const seen = new Set<string>();
+  const deduped: ExactModelOverride[] = [];
+
+  for (let index = overrides.length - 1; index >= 0; index -= 1) {
+    const entry = overrides[index];
+    if (!entry) {
+      continue;
+    }
+    const key = `${normalize(entry.provider)}/${normalize(entry.id)}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.unshift(entry);
+  }
+
+  return deduped;
+}
+
+function dedupeFamilyOverrides(overrides: FamilyOverride[]): FamilyOverride[] {
+  const seen = new Set<string>();
+  const deduped: FamilyOverride[] = [];
+
+  for (let index = overrides.length - 1; index >= 0; index -= 1) {
+    const entry = overrides[index];
+    if (!entry) {
+      continue;
+    }
+    const key = normalize(entry.pattern);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    deduped.unshift(entry);
+  }
+
+  return deduped;
 }
 
 function sanitizeFamilyEnhancerModels(value: unknown): FamilyEnhancerModels | undefined {

@@ -308,6 +308,59 @@ void test("mode command rejects invalid values clearly", async () => {
   );
 });
 
+void test("enhancer-model active clears stale fixed and family-linked config", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel() });
+
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    enhancerModelMode: "family-linked",
+    fixedEnhancerModel: { provider: "openai", id: "gpt-5" },
+    familyEnhancerModels: {
+      gpt: { provider: "openai", id: "gpt-5" },
+      claude: { provider: "anthropic", id: "claude-3-5-sonnet" },
+    },
+  });
+
+  await handlePromptsmithCommand(
+    "enhancer-model active",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("unused")))
+  );
+
+  assert.equal(runtime.getSettings().enhancerModelMode, "active");
+  assert.equal(runtime.getSettings().fixedEnhancerModel, undefined);
+  assert.equal(runtime.getSettings().familyEnhancerModels, undefined);
+});
+
+void test("enhancer-model fixed clears stale family-linked config", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel() });
+
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    enhancerModelMode: "family-linked",
+    familyEnhancerModels: {
+      gpt: { provider: "openai", id: "gpt-5" },
+      claude: { provider: "anthropic", id: "claude-3-5-sonnet" },
+    },
+  });
+
+  await handlePromptsmithCommand(
+    "enhancer-model fixed openai/gpt-5",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("unused")))
+  );
+
+  assert.equal(runtime.getSettings().enhancerModelMode, "fixed");
+  assert.deepEqual(runtime.getSettings().fixedEnhancerModel, { provider: "openai", id: "gpt-5" });
+  assert.equal(runtime.getSettings().familyEnhancerModels, undefined);
+});
+
 void test("status-bar command updates the saved footer status setting", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();

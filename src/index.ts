@@ -24,7 +24,7 @@ export function createPromptsmithExtension(
   };
 
   const restorePersistedSettings = (ctx: ExtensionContext): void => {
-    runtime.restoreSettings(ctx.cwd);
+    runtime.restoreSettings();
     refreshStatus(ctx);
   };
 

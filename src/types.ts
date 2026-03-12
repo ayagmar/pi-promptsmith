@@ -131,11 +131,6 @@ export interface ParsedPromptsmithCommand {
   args: string[];
 }
 
-export interface SessionRestoreResult {
-  settings: PromptsmithSettings;
-  restored: boolean;
-}
-
 export interface BuildPromptContextOptions {
   ctx: ExtensionContext;
   draft: string;
