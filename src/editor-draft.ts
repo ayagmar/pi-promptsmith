@@ -88,14 +88,34 @@ function normalizeLineEndings(text: string): string {
 }
 
 async function readClipboardText(exec: ExtensionAPI["exec"]): Promise<string | undefined> {
+  let lastErr: unknown;
+  let lastCommand: ClipboardCommand | undefined;
+
   for (const command of getClipboardReadCommands()) {
     try {
       const result = await exec(command.command, command.args);
       if (result.code === 0) {
         return result.stdout;
       }
-    } catch {}
+    } catch (error) {
+      lastErr = error;
+      lastCommand = command;
+    }
   }
+
+  if (lastErr) {
+    if (lastErr instanceof Error) {
+      console.error(
+        `Promptsmith failed to read the clipboard with ${lastCommand?.command ?? "an unknown command"}: ${lastErr.stack ?? lastErr.message}`
+      );
+    } else {
+      console.error(
+        `Promptsmith failed to read the clipboard with ${lastCommand?.command ?? "an unknown command"}:`,
+        lastErr
+      );
+    }
+  }
+
   return undefined;
 }
 

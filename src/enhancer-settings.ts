@@ -37,17 +37,21 @@ export function setFamilyEnhancerModel(
     ...(settings.familyEnhancerModels ?? {}),
     [family]: modelRef,
   };
-  const next = {
+  const enhancerModelMode =
+    familyEnhancerModels.gpt && familyEnhancerModels.claude
+      ? ("family-linked" as const)
+      : settings.enhancerModelMode === "fixed"
+        ? ("active" as const)
+        : settings.enhancerModelMode;
+  const next: PromptsmithSettings = {
     ...settings,
-    enhancerModelMode:
-      familyEnhancerModels.gpt && familyEnhancerModels.claude
-        ? ("family-linked" as const)
-        : settings.enhancerModelMode === "fixed"
-          ? ("active" as const)
-          : settings.enhancerModelMode,
+    enhancerModelMode,
     familyEnhancerModels,
   };
   delete next.fixedEnhancerModel;
+  if (next.enhancerModelMode !== "family-linked") {
+    delete next.familyEnhancerModels;
+  }
   return next;
 }
 

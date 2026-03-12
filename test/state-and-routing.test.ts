@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setFamilyEnhancerModel } from "../src/enhancer-settings.js";
 import { resolveEnhancerModel } from "../src/model-selection.js";
 import { matchesPattern, resolveTargetFamily } from "../src/model-routing.js";
 import {
@@ -157,6 +158,42 @@ void test("resolveEnhancerModel validates configuration and API keys", async () 
   );
 });
 
+void test("setFamilyEnhancerModel clears orphaned partial family selections", () => {
+  const runtime = createRuntimeState();
+  const gptModel = { provider: "openai", id: "gpt-5" };
+  const claudeModel = { provider: "anthropic", id: "claude-3-5-sonnet" };
+
+  const partial = setFamilyEnhancerModel(
+    {
+      ...runtime.getSettings(),
+      enhancerModelMode: "fixed",
+      fixedEnhancerModel: gptModel,
+    },
+    "gpt",
+    gptModel
+  );
+
+  assert.equal(partial.enhancerModelMode, "active");
+  assert.equal(partial.fixedEnhancerModel, undefined);
+  assert.equal(partial.familyEnhancerModels, undefined);
+
+  const linked = setFamilyEnhancerModel(
+    {
+      ...runtime.getSettings(),
+      enhancerModelMode: "family-linked",
+      familyEnhancerModels: { gpt: gptModel },
+    },
+    "claude",
+    claudeModel
+  );
+
+  assert.equal(linked.enhancerModelMode, "family-linked");
+  assert.deepEqual(linked.familyEnhancerModels, {
+    gpt: gptModel,
+    claude: claudeModel,
+  });
+});
+
 void test("settings persist across sessions globally", () => {
   const storageDir = mkdtempSync(join(tmpdir(), "promptsmith-state-"));
   const settingsPath = join(storageDir, "promptsmith-settings.json");
@@ -225,6 +262,33 @@ void test("sanitizeSettings dedupes exact and pattern overrides by normalized ke
     { pattern: "moonshot/*", family: "claude" },
     { pattern: "openai/*", family: "claude" },
   ]);
+});
+
+void test("sanitizeSettings rejects array-backed objects in record slots", () => {
+  const arrayBackedOverride = Object.assign([], {
+    provider: "openai",
+    id: "gpt-5",
+    family: "claude",
+  });
+  const arrayBackedRef = Object.assign([], {
+    provider: "openai",
+    id: "gpt-5",
+  });
+  const arrayBackedFamilyModels = Object.assign([], {
+    gpt: { provider: "openai", id: "gpt-5" },
+  });
+
+  const sanitized = sanitizeSettings({
+    version: 1,
+    exactModelOverrides: [arrayBackedOverride],
+    fixedEnhancerModel: arrayBackedRef,
+    familyEnhancerModels: arrayBackedFamilyModels,
+  });
+
+  assert.ok(sanitized);
+  assert.deepEqual(sanitized.exactModelOverrides, []);
+  assert.equal(sanitized.fixedEnhancerModel, undefined);
+  assert.equal(sanitized.familyEnhancerModels, undefined);
 });
 
 void test("runtime support relies on hasUI instead of theme enumeration", () => {

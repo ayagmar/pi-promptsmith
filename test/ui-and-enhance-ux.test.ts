@@ -1,8 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { visibleWidth } from "@mariozechner/pi-tui";
 import { handlePromptsmithCommand } from "../src/commands.js";
 import { resolveEditorDraft } from "../src/editor-draft.js";
+import { PromptsmithRuntimeState } from "../src/state.js";
 import { runSettingsAction } from "../src/ui/settings-actions.js";
 import { openSelectDialog } from "../src/ui/select-dialog.js";
 import {
@@ -236,6 +240,34 @@ void test("resolveEditorDraft tries the Windows clipboard first on WSL", async (
   }
 });
 
+void test("resolveEditorDraft logs clipboard command failures before giving up", async () => {
+  const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
+  const originalConsoleError = console.error;
+  const loggedErrors: string[] = [];
+
+  Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
+  console.error = (...args: unknown[]) => {
+    loggedErrors.push(args.map((value) => String(value)).join(" "));
+  };
+
+  try {
+    const ctx = createCommandContext({ editorText: "Paste here: [paste #1]" });
+
+    await assert.rejects(
+      resolveEditorDraft(ctx, () => Promise.reject(new Error("pbpaste failed"))),
+      /Promptsmith found Pi paste markers/
+    );
+
+    assert.match(loggedErrors.join("\n"), /Promptsmith failed to read the clipboard/i);
+    assert.match(loggedErrors.join("\n"), /pbpaste failed/i);
+  } finally {
+    console.error = originalConsoleError;
+    if (platformDescriptor) {
+      Object.defineProperty(process, "platform", platformDescriptor);
+    }
+  }
+});
+
 void test("clearing the fixed enhancer model in fixed mode falls back to active mode", async () => {
   const runtime = createRuntimeState();
   runtime.replaceSettings({
@@ -422,6 +454,36 @@ void test("settings actions persist against the latest runtime snapshot", async 
 
   assert.equal(runtime.getSettings().enabled, false);
   assert.equal(runtime.getSettings().statusBarEnabled, true);
+});
+
+void test("settings actions report persistence failures without throwing", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "promptsmith-ui-state-"));
+  const filePath = join(tempDir, "not-a-directory");
+  writeFileSync(filePath, "x", "utf8");
+
+  const runtime = new PromptsmithRuntimeState(join(filePath, "promptsmith-settings.json"));
+  const previousSettings = runtime.getSettings();
+  const ctx = createCommandContext();
+  let refreshCount = 0;
+
+  await runSettingsAction("enabled", {
+    ctx,
+    runtime,
+    services: {
+      refreshStatus: () => {
+        refreshCount += 1;
+      },
+    },
+    settings: runtime.getSettings(),
+  });
+
+  assert.deepEqual(runtime.getSettings(), previousSettings);
+  assert.equal(refreshCount, 1);
+  assert.equal(ctx.uiState.notifications.at(-1)?.type, "error");
+  assert.match(
+    ctx.uiState.notifications.at(-1)?.message ?? "",
+    /failed to save promptsmith settings/i
+  );
 });
 
 void test("pattern override removal uses the raw pattern value and clears case-variant duplicates", async () => {

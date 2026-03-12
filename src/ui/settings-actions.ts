@@ -351,9 +351,17 @@ function persistSettings(
   message: SettingsMessage
 ): void {
   const next = typeof change === "function" ? change(runtime.getSettings()) : change;
-  runtime.persistSettings(next);
-  services.refreshStatus(ctx);
-  ctx.ui.notify(typeof message === "function" ? message(next) : message, "info");
+  const successMessage = typeof message === "function" ? message(next) : message;
+
+  try {
+    runtime.persistSettings(next);
+    services.refreshStatus(ctx);
+    ctx.ui.notify(successMessage, "info");
+  } catch (error) {
+    services.refreshStatus(ctx);
+    const detail = error instanceof Error ? error.message : String(error);
+    ctx.ui.notify(`Failed to save Promptsmith settings. ${detail}`, "error");
+  }
 }
 
 async function manageExactOverrides(
