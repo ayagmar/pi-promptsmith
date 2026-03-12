@@ -307,6 +307,31 @@ Load the local extension in Pi:
 pi -e ./src/index.ts
 ```
 
+## Releases
+
+This repository includes a manual GitHub Actions release workflow at `.github/workflows/release.yml`.
+
+Before using it, add an `NPM_TOKEN` repository secret with publish access to the `pi-promptsmith` package on npm.
+
+Then trigger the **Release** workflow from GitHub Actions and choose:
+
+- `patch`, `minor`, or `major`
+- whether this is the first npm publish (`first_release = true`)
+
+For local maintainer-driven releases, you can also run:
+
+```bash
+pnpm run release
+```
+
+Or for the initial npm publish:
+
+```bash
+pnpm run release:first
+```
+
+The release flow uses `release-it`, publishes to npm, creates a git tag, and updates `CHANGELOG.md` from conventional commits.
+
 ## Reference docs
 
 This repository currently keeps its user-facing documentation in `README.md` and inline source comments/tests.
