@@ -86,6 +86,37 @@ void test("shortcut with empty editor opens settings", async () => {
   assert.deepEqual(ctx.uiState.selectTitles, ["Promptsmith settings"]);
 });
 
+void test("shortcut expands Pi paste markers from the clipboard before enhancement", async () => {
+  const runtime = createRuntimeState();
+  const ctx = createCommandContext({
+    model: createModel(),
+    editorText: "[paste #1 +12 lines]",
+  });
+  const clipboardText = Array.from({ length: 12 }, (_, index) => `line ${index + 1}`).join("\n");
+
+  let requestText = "";
+  await handlePromptsmithShortcut(ctx, runtime, {
+    completeFn: (_model, context) => {
+      const userMessage = context.messages[0];
+      if (userMessage?.role === "user" && Array.isArray(userMessage.content)) {
+        const textPart = userMessage.content.find(
+          (part): part is { type: "text"; text: string } => part.type === "text"
+        );
+        requestText = textPart?.text ?? "";
+      }
+      return Promise.resolve(createCompleteResponse("Enhanced prompt"));
+    },
+    exec: () => Promise.resolve({ stdout: clipboardText, stderr: "", code: 0, killed: false }),
+    refreshStatus: () => undefined,
+    runCancellableTask: (_ctx, _message, task) => task(new AbortController().signal),
+    openSettings: () => Promise.resolve(),
+  });
+
+  assert.match(requestText, /line 12/);
+  assert.doesNotMatch(requestText, /\[paste #1 \+12 lines\]/);
+  assert.equal(ctx.uiState.editorText, "Enhanced prompt");
+});
+
 void test("settings ui shows clearer labels and the footer status toggle", async () => {
   const runtime = createRuntimeState();
   const ctx = createCommandContext({ model: createModel(), nextSelectValue: "done" });

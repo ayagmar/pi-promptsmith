@@ -145,6 +145,97 @@ void test("exact override removal clears case-variant duplicates", async () => {
   assert.equal(refreshCount, 1);
 });
 
+void test("settings actions persist against the latest runtime snapshot", async () => {
+  const runtime = createRuntimeState();
+  const staleSettings = runtime.getSettings();
+  runtime.replaceSettings({ ...runtime.getSettings(), statusBarEnabled: true });
+
+  const ctx = createCommandContext();
+
+  await runSettingsAction("enabled", {
+    ctx,
+    runtime,
+    services: {
+      refreshStatus: () => undefined,
+    },
+    settings: staleSettings,
+  });
+
+  assert.equal(runtime.getSettings().enabled, false);
+  assert.equal(runtime.getSettings().statusBarEnabled, true);
+});
+
+void test("pattern override removal uses the raw pattern as the selected value", async () => {
+  const runtime = createRuntimeState();
+  const pattern = "openai/with → arrow";
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    familyOverrides: [
+      { pattern, family: "claude" },
+      { pattern: "moonshot/*", family: "gpt" },
+    ],
+  });
+
+  const ctx = createCommandContext();
+  const selections = ["Remove rule", pattern, undefined];
+  let removeRuleOptions: { label: string; value: string }[] = [];
+  Object.assign(ctx.ui, {
+    custom: (factory: unknown) => {
+      const component =
+        typeof factory === "function"
+          ? (
+              factory as (
+                tui: { requestRender: () => void },
+                theme: {
+                  fg: (color: string, text: string) => string;
+                  bg: (color: string, text: string) => string;
+                  bold: (text: string) => string;
+                },
+                keybindings: unknown,
+                done: (value: string | undefined) => void
+              ) => unknown
+            )(
+              { requestRender: () => undefined },
+              {
+                fg: (_color: string, text: string) => text,
+                bg: (_color: string, text: string) => text,
+                bold: (text: string) => text,
+              },
+              undefined,
+              () => undefined
+            )
+          : factory;
+
+      const dialog = component as {
+        title?: string;
+        allItems?: { label: string; value: string }[];
+      };
+      if (dialog.title === "Remove pattern style rule") {
+        removeRuleOptions = dialog.allItems?.map((item) => ({ ...item })) ?? [];
+      }
+
+      return Promise.resolve(selections.shift());
+    },
+  });
+
+  await runSettingsAction("familyOverrides", {
+    ctx,
+    runtime,
+    services: {
+      refreshStatus: () => undefined,
+    },
+    settings: runtime.getSettings(),
+  });
+
+  assert.deepEqual(removeRuleOptions[0], {
+    label: `${pattern} → claude`,
+    value: pattern,
+  });
+  assert.deepEqual(runtime.getSettings().familyOverrides, [
+    { pattern: "moonshot/*", family: "gpt" },
+  ]);
+});
+
 void test("enhancement retries once when the first model response breaks the sentinel contract", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();

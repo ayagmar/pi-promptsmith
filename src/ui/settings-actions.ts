@@ -38,6 +38,10 @@ interface SettingsActionContext {
   settings: PromptsmithSettings;
 }
 
+type SettingsChange = PromptsmithSettings | ((current: PromptsmithSettings) => PromptsmithSettings);
+
+type SettingsMessage = string | ((next: PromptsmithSettings) => string);
+
 export async function runSettingsAction(
   choice: Exclude<SettingsMenuOptionId, "done">,
   options: SettingsActionContext
@@ -50,8 +54,8 @@ export async function runSettingsAction(
         ctx,
         runtime,
         services,
-        { ...settings, enabled: !settings.enabled },
-        `Promptsmith is now ${settings.enabled ? "off" : "on"}.`
+        (latest) => ({ ...latest, enabled: !latest.enabled }),
+        (next) => `Promptsmith is now ${next.enabled ? "on" : "off"}.`
       );
       return;
     case "shortcutEnabled":
@@ -59,8 +63,8 @@ export async function runSettingsAction(
         ctx,
         runtime,
         services,
-        { ...settings, shortcutEnabled: !settings.shortcutEnabled },
-        `Keyboard shortcut is now ${settings.shortcutEnabled ? "off" : "on"}.`
+        (latest) => ({ ...latest, shortcutEnabled: !latest.shortcutEnabled }),
+        (next) => `Keyboard shortcut is now ${next.shortcutEnabled ? "on" : "off"}.`
       );
       return;
     case "targetFamilyMode": {
@@ -76,7 +80,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          { ...settings, targetFamilyMode: nextMode },
+          (latest) => ({ ...latest, targetFamilyMode: nextMode }),
           `Prompt style target set to ${nextMode}.`
         );
       }
@@ -92,7 +96,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          { ...settings, fallbackFamily: family },
+          (latest) => ({ ...latest, fallbackFamily: family }),
           `Unknown models now default to ${family}.`
         );
       }
@@ -111,7 +115,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          { ...settings, enhancerModelMode: nextMode },
+          (latest) => ({ ...latest, enhancerModelMode: nextMode }),
           `Enhancer model choice set to ${nextMode}.`
         );
       }
@@ -124,7 +128,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          removeFixedEnhancerModel(settings),
+          (latest) => removeFixedEnhancerModel(latest),
           "Fixed enhancer model cleared."
         );
       } else if (modelRef) {
@@ -132,7 +136,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          { ...settings, fixedEnhancerModel: modelRef },
+          (latest) => ({ ...latest, fixedEnhancerModel: modelRef }),
           `Fixed enhancer model set to ${modelRef.provider}/${modelRef.id}.`
         );
       }
@@ -145,7 +149,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          updateFamilyEnhancerModel(settings, "gpt", undefined),
+          (latest) => updateFamilyEnhancerModel(latest, "gpt", undefined),
           "GPT-style enhancer model cleared."
         );
       } else if (modelRef) {
@@ -153,7 +157,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          updateFamilyEnhancerModel(settings, "gpt", modelRef),
+          (latest) => updateFamilyEnhancerModel(latest, "gpt", modelRef),
           `GPT-style enhancer model set to ${modelRef.provider}/${modelRef.id}.`
         );
       }
@@ -166,7 +170,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          updateFamilyEnhancerModel(settings, "claude", undefined),
+          (latest) => updateFamilyEnhancerModel(latest, "claude", undefined),
           "Claude-style enhancer model cleared."
         );
       } else if (modelRef) {
@@ -174,7 +178,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          updateFamilyEnhancerModel(settings, "claude", modelRef),
+          (latest) => updateFamilyEnhancerModel(latest, "claude", modelRef),
           `Claude-style enhancer model set to ${modelRef.provider}/${modelRef.id}.`
         );
       }
@@ -185,10 +189,14 @@ export async function runSettingsAction(
         ctx,
         runtime,
         services,
-        { ...settings, includeRecentConversation: !settings.includeRecentConversation },
-        settings.includeRecentConversation
-          ? "Recent chat context disabled for faster rewrites."
-          : "Recent chat context enabled. Rewrites may be slower but more aware of the thread."
+        (latest) => ({
+          ...latest,
+          includeRecentConversation: !latest.includeRecentConversation,
+        }),
+        (next) =>
+          next.includeRecentConversation
+            ? "Recent chat context enabled. Rewrites may be slower but more aware of the thread."
+            : "Recent chat context disabled for faster rewrites."
       );
       return;
     case "includeProjectMetadata":
@@ -196,8 +204,8 @@ export async function runSettingsAction(
         ctx,
         runtime,
         services,
-        { ...settings, includeProjectMetadata: !settings.includeProjectMetadata },
-        `Project metadata is now ${settings.includeProjectMetadata ? "off" : "on"}.`
+        (latest) => ({ ...latest, includeProjectMetadata: !latest.includeProjectMetadata }),
+        (next) => `Project metadata is now ${next.includeProjectMetadata ? "on" : "off"}.`
       );
       return;
     case "statusBarEnabled":
@@ -205,8 +213,8 @@ export async function runSettingsAction(
         ctx,
         runtime,
         services,
-        { ...settings, statusBarEnabled: !settings.statusBarEnabled },
-        `Status bar is now ${settings.statusBarEnabled ? "off" : "on"}.`
+        (latest) => ({ ...latest, statusBarEnabled: !latest.statusBarEnabled }),
+        (next) => `Status bar is now ${next.statusBarEnabled ? "on" : "off"}.`
       );
       return;
     case "enhancementTimeoutMs": {
@@ -223,7 +231,7 @@ export async function runSettingsAction(
         ctx,
         runtime,
         services,
-        { ...settings, enhancementTimeoutMs: timeoutMs },
+        (latest) => ({ ...latest, enhancementTimeoutMs: timeoutMs }),
         `Enhancement timeout set to ${formatTimeoutSeconds(timeoutMs)}.`
       );
       return;
@@ -241,7 +249,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          { ...settings, rewriteStrength: nextStrength },
+          (latest) => ({ ...latest, rewriteStrength: nextStrength }),
           `Rewrite strength set to ${nextStrength}.`
         );
       }
@@ -260,7 +268,7 @@ export async function runSettingsAction(
           ctx,
           runtime,
           services,
-          { ...settings, rewriteMode: nextRewriteMode },
+          (latest) => ({ ...latest, rewriteMode: nextRewriteMode }),
           `Rewrite mode set to ${nextRewriteMode}.`
         );
       }
@@ -271,8 +279,8 @@ export async function runSettingsAction(
         ctx,
         runtime,
         services,
-        { ...settings, previewBeforeReplace: !settings.previewBeforeReplace },
-        `Review before replace is now ${settings.previewBeforeReplace ? "off" : "on"}.`
+        (latest) => ({ ...latest, previewBeforeReplace: !latest.previewBeforeReplace }),
+        (next) => `Review before replace is now ${next.previewBeforeReplace ? "on" : "off"}.`
       );
       return;
     case "preserveCodeBlocks":
@@ -280,8 +288,8 @@ export async function runSettingsAction(
         ctx,
         runtime,
         services,
-        { ...settings, preserveCodeBlocks: !settings.preserveCodeBlocks },
-        `Code block preservation is now ${settings.preserveCodeBlocks ? "off" : "on"}.`
+        (latest) => ({ ...latest, preserveCodeBlocks: !latest.preserveCodeBlocks }),
+        (next) => `Code block preservation is now ${next.preserveCodeBlocks ? "on" : "off"}.`
       );
       return;
     case "exactModelOverrides":
@@ -314,12 +322,13 @@ function persistSettings(
   ctx: ExtensionContext,
   runtime: PromptsmithRuntimeState,
   services: SettingsUiServices,
-  settings: PromptsmithSettings,
-  message: string
+  change: SettingsChange,
+  message: SettingsMessage
 ): void {
-  runtime.persistSettings(settings);
+  const next = typeof change === "function" ? change(runtime.getSettings()) : change;
+  runtime.persistSettings(next);
   services.refreshStatus(ctx);
-  ctx.ui.notify(message, "info");
+  ctx.ui.notify(typeof message === "function" ? message(next) : message, "info");
 }
 
 async function manageExactOverrides(
@@ -349,12 +358,11 @@ async function manageExactOverrides(
         if (modelRef) {
           const family = await selectFamily(ctx, "Choose the prompt style for this model");
           if (family) {
-            const next = upsertExactModelOverride(settings, modelRef, family);
             persistSettings(
               ctx,
               runtime,
               services,
-              next,
+              (latest) => upsertExactModelOverride(latest, modelRef, family),
               `Mapped ${modelRef.provider}/${modelRef.id} to ${family}.`
             );
           }
@@ -373,36 +381,37 @@ async function manageExactOverrides(
           }
           const modelRef = parseModelRef(modelText);
           if (modelRef) {
-            const next = {
-              ...settings,
-              exactModelOverrides: settings.exactModelOverrides.filter(
-                (entry) =>
-                  !(
-                    normalize(entry.provider) === normalize(modelRef.provider) &&
-                    normalize(entry.id) === normalize(modelRef.id)
-                  )
-              ),
-            };
-            persistSettings(ctx, runtime, services, next, `Removed the rule for ${modelText}.`);
+            persistSettings(
+              ctx,
+              runtime,
+              services,
+              (latest) => ({
+                ...latest,
+                exactModelOverrides: latest.exactModelOverrides.filter(
+                  (entry) =>
+                    !(
+                      normalize(entry.provider) === normalize(modelRef.provider) &&
+                      normalize(entry.id) === normalize(modelRef.id)
+                    )
+                ),
+              }),
+              `Removed the rule for ${modelText}.`
+            );
           }
         }
         break;
       }
       default:
         if (choice?.startsWith("Map active model") && ctx.model) {
+          const activeModel = { provider: ctx.model.provider, id: ctx.model.id };
           const family = await selectFamily(ctx, "Choose the prompt style for the active model");
           if (family) {
-            const next = upsertExactModelOverride(
-              settings,
-              { provider: ctx.model.provider, id: ctx.model.id },
-              family
-            );
             persistSettings(
               ctx,
               runtime,
               services,
-              next,
-              `Mapped ${ctx.model.provider}/${ctx.model.id} to ${family}.`
+              (latest) => upsertExactModelOverride(latest, activeModel, family),
+              `Mapped ${activeModel.provider}/${activeModel.id} to ${family}.`
             );
           }
         }
@@ -445,37 +454,38 @@ async function managePatternOverrides(
           break;
         }
         const trimmedPattern = pattern.trim();
-        const next = {
-          ...settings,
-          familyOverrides: [
-            ...settings.familyOverrides.filter((entry) => entry.pattern !== trimmedPattern),
-            { pattern: trimmedPattern, family },
-          ],
-        };
         persistSettings(
           ctx,
           runtime,
           services,
-          next,
+          (latest) => ({
+            ...latest,
+            familyOverrides: [
+              ...latest.familyOverrides.filter((entry) => entry.pattern !== trimmedPattern),
+              { pattern: trimmedPattern, family },
+            ],
+          }),
           `Pattern ${trimmedPattern} now routes to ${family}.`
         );
         break;
       }
       case "Remove rule": {
-        const patternRuleOptions = settings.familyOverrides.map(
-          (entry) => `${entry.pattern} → ${entry.family}`
-        );
+        const patternRuleOptions = settings.familyOverrides.map((entry) => ({
+          label: `${entry.pattern} → ${entry.family}`,
+          value: entry.pattern,
+        }));
         const selected = await selectOption(ctx, "Remove pattern style rule", patternRuleOptions);
         if (selected) {
-          const [pattern] = selected.split(" → ");
-          if (!pattern) {
-            break;
-          }
-          const next = {
-            ...settings,
-            familyOverrides: settings.familyOverrides.filter((entry) => entry.pattern !== pattern),
-          };
-          persistSettings(ctx, runtime, services, next, `Removed the rule ${pattern}.`);
+          persistSettings(
+            ctx,
+            runtime,
+            services,
+            (latest) => ({
+              ...latest,
+              familyOverrides: latest.familyOverrides.filter((entry) => entry.pattern !== selected),
+            }),
+            `Removed the rule ${selected}.`
+          );
         }
         break;
       }

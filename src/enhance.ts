@@ -4,6 +4,7 @@ import { DEFAULT_ENHANCEMENT_TIMEOUT_MS, ENHANCER_MAX_OUTPUT_TOKENS } from "./co
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { BorderedLoader } from "@mariozechner/pi-coding-agent";
 import { buildPromptContext } from "./context.js";
+import { resolveEditorDraft } from "./editor-draft.js";
 import { resolveEnhancerModel } from "./model-selection.js";
 import { resolveTargetFamily } from "./model-routing.js";
 import { buildSentinelReminder, parseEnhancedPrompt } from "./parser.js";
@@ -54,7 +55,7 @@ export async function enhanceEditorDraft(
   const settings = runtime.getSettings();
   ensureEnhancementEnabled(settings);
 
-  const draft = ctx.ui.getEditorText();
+  const draft = await resolveEditorDraft(ctx, services.exec);
   requireNonEmptyDraft(draft);
 
   if (!runtime.tryStartEnhancement()) {
