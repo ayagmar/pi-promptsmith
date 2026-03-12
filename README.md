@@ -1,30 +1,17 @@
 # pi-promptsmith
 
-Prompt enhancement for Pi, in place.
+Promptsmith is a prompt-rewriting extension for [Pi](https://github.com/mariozechner/pi-coding-agent). It takes the rough draft in your Pi editor and turns it into a clearer, stronger prompt without making you leave the editor.
 
-`pi-promptsmith` rewrites whatever is currently in the Pi editor into a clearer, stronger prompt without making you leave the editor.
+![Promptsmith demo](./promptsmith.gif)
 
 It supports two output styles:
 
 - **Plain rewrite** — tighten and clarify the prompt
 - **Execution contract** — turn a rough task into a compact, agent-executable spec
 
-## Quick start
-
-Write a rough prompt in the Pi editor, then:
-
-- press `Alt+P`, or
-- run `/promptsmith`
-
-Promptsmith rewrites the current draft directly in the editor.
-
-To undo the last enhancement:
-
-- run `/promptsmith undo`
-
 ## Installation
 
-Try it without installing globally:
+Run it once in Pi without installing:
 
 ```bash
 pi -e npm:pi-promptsmith
@@ -36,11 +23,24 @@ Install it as a Pi package:
 pi install npm:pi-promptsmith
 ```
 
-Or install from git:
+Or install directly from git:
 
 ```bash
 pi install git:github.com/ayagmar/pi-promptsmith
 ```
+
+## Quick start
+
+Write a rough request in the Pi editor, then:
+
+- press `Alt+P`, or
+- run `/promptsmith`
+
+Promptsmith rewrites the current draft directly in the editor.
+
+To undo the last enhancement:
+
+- run `/promptsmith undo`
 
 ## How it works
 
@@ -307,6 +307,4 @@ Load the local extension in Pi:
 pi -e ./src/index.ts
 ```
 
-## Reference docs
-
-This repository currently keeps its user-facing documentation in `README.md` and inline source comments/tests.
+Maintainer release notes live in [`docs/releasing.md`](./docs/releasing.md).
