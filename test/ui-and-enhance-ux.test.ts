@@ -288,7 +288,6 @@ void test("clearing the fixed enhancer model in fixed mode falls back to active 
     services: {
       refreshStatus: () => undefined,
     },
-    settings: runtime.getSettings(),
   });
 
   assert.equal(runtime.getSettings().enhancerModelMode, "active");
@@ -346,7 +345,6 @@ void test("exact override manual routing picker omits the Clear option", async (
     services: {
       refreshStatus: () => undefined,
     },
-    settings: runtime.getSettings(),
   });
 
   assert.equal(
@@ -423,7 +421,6 @@ void test("exact override removal clears case-variant duplicates and uses the ra
         refreshCount += 1;
       },
     },
-    settings: runtime.getSettings(),
   });
 
   assert.deepEqual(removeRuleOptions[0], {
@@ -438,7 +435,6 @@ void test("exact override removal clears case-variant duplicates and uses the ra
 
 void test("settings actions persist against the latest runtime snapshot", async () => {
   const runtime = createRuntimeState();
-  const staleSettings = runtime.getSettings();
   runtime.replaceSettings({ ...runtime.getSettings(), statusBarEnabled: true });
 
   const ctx = createCommandContext();
@@ -449,7 +445,6 @@ void test("settings actions persist against the latest runtime snapshot", async 
     services: {
       refreshStatus: () => undefined,
     },
-    settings: staleSettings,
   });
 
   assert.equal(runtime.getSettings().enabled, false);
@@ -474,7 +469,6 @@ void test("settings actions report persistence failures without throwing", async
         refreshCount += 1;
       },
     },
-    settings: runtime.getSettings(),
   });
 
   assert.deepEqual(runtime.getSettings(), previousSettings);
@@ -546,7 +540,6 @@ void test("pattern override removal uses the raw pattern value and clears case-v
     services: {
       refreshStatus: () => undefined,
     },
-    settings: runtime.getSettings(),
   });
 
   assert.deepEqual(removeRuleOptions[1], {

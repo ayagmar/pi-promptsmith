@@ -18,9 +18,12 @@ import {
 } from "../overrides.js";
 import { cloneSettings } from "../state.js";
 import type { PromptsmithRuntimeState } from "../state.js";
+import { DEFAULT_SHORTCUT_KEY } from "../constants.js";
+import { formatShortcutKey, isDefaultShortcutConfigured } from "../shortcut-key.js";
 import type { ModelRef, PromptsmithFamily, PromptsmithSettings } from "../types.js";
 import { parseEnhancementTimeoutSeconds } from "../validation.js";
 import { openSelectDialog, type SelectDialogItem } from "./select-dialog.js";
+import { captureShortcutKey } from "./shortcut-capture.js";
 import {
   describeSelectedEnhancerMode,
   describeSelectedRewriteMode,
@@ -47,7 +50,6 @@ interface SettingsActionContext {
   ctx: ExtensionContext;
   runtime: PromptsmithRuntimeState;
   services: SettingsUiServices;
-  settings: PromptsmithSettings;
 }
 
 type SettingsChange = PromptsmithSettings | ((current: PromptsmithSettings) => PromptsmithSettings);
@@ -58,7 +60,8 @@ export async function runSettingsAction(
   choice: Exclude<SettingsMenuOptionId, "done">,
   options: SettingsActionContext
 ): Promise<void> {
-  const { ctx, runtime, services, settings } = options;
+  const { ctx, runtime, services } = options;
+  const settings = runtime.getSettings();
 
   switch (choice) {
     case "enabled":
@@ -70,15 +73,62 @@ export async function runSettingsAction(
         (next) => `Promptsmith is now ${next.enabled ? "on" : "off"}.`
       );
       return;
-    case "shortcutEnabled":
-      persistSettings(
+    case "shortcutEnabled": {
+      const shortcutChoice = await selectOption(
         ctx,
-        runtime,
-        services,
-        (latest) => ({ ...latest, shortcutEnabled: !latest.shortcutEnabled }),
-        (next) => `Keyboard shortcut is now ${next.shortcutEnabled ? "on" : "off"}.`
+        "Keyboard shortcut",
+        [
+          "Change keybinding",
+          `${settings.shortcutEnabled ? "Turn shortcut off" : "Turn shortcut on"}`,
+          ...(!isDefaultShortcutConfigured(settings) ? ["Reset to Alt+P"] : []),
+          "Back",
+        ],
+        "Back"
       );
-      return;
+
+      switch (shortcutChoice) {
+        case undefined:
+        case "Back":
+          return;
+        case "Change keybinding": {
+          const shortcutKey = await captureShortcutKey(ctx, {
+            currentValue: settings.shortcutKey,
+          });
+          if (!shortcutKey) {
+            return;
+          }
+          persistSettings(
+            ctx,
+            runtime,
+            services,
+            (latest) => ({ ...latest, shortcutEnabled: true, shortcutKey }),
+            `Keyboard shortcut set to ${formatShortcutKey(shortcutKey)}.`
+          );
+          return;
+        }
+        case "Turn shortcut off":
+        case "Turn shortcut on":
+          persistSettings(
+            ctx,
+            runtime,
+            services,
+            (latest) => ({ ...latest, shortcutEnabled: !latest.shortcutEnabled }),
+            (next) => `Keyboard shortcut is now ${next.shortcutEnabled ? "on" : "off"}.`
+          );
+          return;
+        case "Reset to Alt+P":
+          persistSettings(
+            ctx,
+            runtime,
+            services,
+            (latest) => ({ ...latest, shortcutKey: DEFAULT_SHORTCUT_KEY }),
+            "Keyboard shortcut reset to Alt+P."
+          );
+          return;
+        default:
+          return;
+      }
+    }
     case "targetFamilyMode": {
       const mode = await selectOption(
         ctx,

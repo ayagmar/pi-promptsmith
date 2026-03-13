@@ -34,7 +34,7 @@ export async function openSettingsUi(
       return;
     }
 
-    await runSettingsAction(choice, { ctx, runtime, services, settings });
+    await runSettingsAction(choice, { ctx, runtime, services });
   }
 }
 

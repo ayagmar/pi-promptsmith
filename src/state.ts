@@ -7,6 +7,7 @@ import {
   MAX_ENHANCEMENT_TIMEOUT_MS,
   MIN_ENHANCEMENT_TIMEOUT_MS,
 } from "./constants.js";
+import { normalizeShortcutKey } from "./shortcut-key.js";
 import { normalize } from "./model-routing.js";
 import type {
   ExactModelOverride,
@@ -95,6 +96,7 @@ export function sanitizeSettings(value: unknown): PromptsmithSettings | undefine
     version: DEFAULT_SETTINGS.version,
     enabled: readBoolean(value.enabled, DEFAULT_SETTINGS.enabled),
     shortcutEnabled: readBoolean(value.shortcutEnabled, DEFAULT_SETTINGS.shortcutEnabled),
+    shortcutKey: readShortcutKey(value.shortcutKey),
     targetFamilyMode: readTargetFamilyMode(value.targetFamilyMode),
     fallbackFamily: readFamily(value.fallbackFamily, DEFAULT_SETTINGS.fallbackFamily),
     exactModelOverrides: sanitizeExactOverrides(value.exactModelOverrides),
@@ -240,6 +242,14 @@ function readFamily<TFallback extends string | undefined>(
   fallback: TFallback
 ): "gpt" | "claude" | TFallback {
   return value === "gpt" || value === "claude" ? value : fallback;
+}
+
+function readShortcutKey(value: unknown): string {
+  if (typeof value !== "string") {
+    return DEFAULT_SETTINGS.shortcutKey;
+  }
+
+  return normalizeShortcutKey(value) ?? DEFAULT_SETTINGS.shortcutKey;
 }
 
 function readTargetFamilyMode(value: unknown): PromptsmithSettings["targetFamilyMode"] {

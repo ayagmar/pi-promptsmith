@@ -3,7 +3,7 @@ import type { PromptsmithSettings } from "./types.js";
 export const EXTENSION_NAME = "pi-promptsmith";
 export const EXTENSION_COMMAND = "promptsmith";
 // Avoid Pi built-ins and common extension collisions.
-export const SHORTCUT_KEY = "alt+p";
+export const DEFAULT_SHORTCUT_KEY = "alt+p";
 
 export const SETTINGS_VERSION = 1;
 export const SENTINEL_OPEN = "<promptsmith-enhanced-prompt>";
@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS: PromptsmithSettings = {
   version: SETTINGS_VERSION,
   enabled: true,
   shortcutEnabled: true,
+  shortcutKey: DEFAULT_SHORTCUT_KEY,
   targetFamilyMode: "auto",
   fallbackFamily: "gpt",
   exactModelOverrides: [],

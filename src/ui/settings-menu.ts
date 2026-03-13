@@ -1,4 +1,5 @@
 import type { SelectDialogItem } from "./select-dialog.js";
+import { formatShortcutKey } from "../shortcut-key.js";
 import type { ModelRef, PromptsmithSettings } from "../types.js";
 
 export type SettingsMenuOptionId =
@@ -60,13 +61,13 @@ export function buildSettingsMenuOptions(
       "enabled",
       "Prompt enhancement",
       onOff(settings.enabled),
-      "Master switch for /promptsmith and Alt+P."
+      "Master switch for /promptsmith and the keyboard shortcut."
     ),
     shortcutEnabled: createSettingsMenuItem(
       "shortcutEnabled",
-      "Keyboard shortcut (Alt+P)",
-      onOff(settings.shortcutEnabled),
-      "Run Promptsmith directly from the editor."
+      "Keyboard shortcut",
+      `${onOff(settings.shortcutEnabled)} · ${formatShortcutKey(settings.shortcutKey)}`,
+      "Run Promptsmith directly from the editor. Change the key combo or turn it off."
     ),
     statusBarEnabled: createSettingsMenuItem(
       "statusBarEnabled",
