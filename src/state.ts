@@ -7,6 +7,7 @@ import {
   MAX_ENHANCEMENT_TIMEOUT_MS,
   MIN_ENHANCEMENT_TIMEOUT_MS,
 } from "./constants.js";
+import { validateShortcutKey } from "./shortcut-key.js";
 import { normalize } from "./model-routing.js";
 import type {
   ExactModelOverride,
@@ -95,6 +96,7 @@ export function sanitizeSettings(value: unknown): PromptsmithSettings | undefine
     version: DEFAULT_SETTINGS.version,
     enabled: readBoolean(value.enabled, DEFAULT_SETTINGS.enabled),
     shortcutEnabled: readBoolean(value.shortcutEnabled, DEFAULT_SETTINGS.shortcutEnabled),
+    shortcutKey: readShortcutKey(value.shortcutKey),
     targetFamilyMode: readTargetFamilyMode(value.targetFamilyMode),
     fallbackFamily: readFamily(value.fallbackFamily, DEFAULT_SETTINGS.fallbackFamily),
     exactModelOverrides: sanitizeExactOverrides(value.exactModelOverrides),
@@ -185,10 +187,7 @@ function dedupeExactOverrides(overrides: ExactModelOverride[]): ExactModelOverri
   const deduped: ExactModelOverride[] = [];
 
   for (let index = overrides.length - 1; index >= 0; index -= 1) {
-    const entry = overrides[index];
-    if (!entry) {
-      continue;
-    }
+    const entry = overrides[index]!;
     const key = `${normalize(entry.provider)}/${normalize(entry.id)}`;
     if (seen.has(key)) {
       continue;
@@ -205,10 +204,7 @@ function dedupeFamilyOverrides(overrides: FamilyOverride[]): FamilyOverride[] {
   const deduped: FamilyOverride[] = [];
 
   for (let index = overrides.length - 1; index >= 0; index -= 1) {
-    const entry = overrides[index];
-    if (!entry) {
-      continue;
-    }
+    const entry = overrides[index]!;
     const key = normalize(entry.pattern);
     if (seen.has(key)) {
       continue;
@@ -240,6 +236,14 @@ function readFamily<TFallback extends string | undefined>(
   fallback: TFallback
 ): "gpt" | "claude" | TFallback {
   return value === "gpt" || value === "claude" ? value : fallback;
+}
+
+function readShortcutKey(value: unknown): string {
+  if (typeof value !== "string") {
+    return DEFAULT_SETTINGS.shortcutKey;
+  }
+
+  return validateShortcutKey(value).normalized ?? DEFAULT_SETTINGS.shortcutKey;
 }
 
 function readTargetFamilyMode(value: unknown): PromptsmithSettings["targetFamilyMode"] {

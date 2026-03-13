@@ -1,11 +1,17 @@
 import { complete } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { CompleteFn } from "./enhance.js";
-import { EXTENSION_COMMAND, SHORTCUT_KEY } from "./constants.js";
+import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "./constants.js";
 import { getPromptsmithArgumentCompletions, handlePromptsmithCommand } from "./commands.js";
+import { runEnhancementWithLoader } from "./enhance.js";
+import {
+  findShortcutConflictAction,
+  formatShortcutKey,
+  normalizeShortcutKey,
+} from "./shortcut-key.js";
 import { PromptsmithRuntimeState } from "./state.js";
 import { handlePromptsmithShortcut } from "./shortcut.js";
-import { runEnhancementWithLoader } from "./enhance.js";
+import { PromptsmithEditor } from "./ui/promptsmith-editor.js";
 import { openSettingsUi } from "./ui/settings.js";
 import { refreshStatusLine } from "./ui/status.js";
 
@@ -18,9 +24,102 @@ export function createPromptsmithExtension(
   options?: { completeFn?: CompleteFn }
 ): void {
   const runtime = new PromptsmithRuntimeState();
+  let ownsEditorComponent = false;
+  let installedCustomShortcutKey: string | undefined;
+  let activeCustomShortcutKey: string | undefined;
+
+  const clearEditorComponent = (ctx: ExtensionContext): void => {
+    installedCustomShortcutKey = undefined;
+    activeCustomShortcutKey = undefined;
+    if (!ctx.hasUI || !ownsEditorComponent) {
+      return;
+    }
+
+    ctx.ui.setEditorComponent(undefined);
+    ownsEditorComponent = false;
+  };
+
+  const applyEditorComponent = (ctx: ExtensionContext): void => {
+    if (!ctx.hasUI) {
+      return;
+    }
+
+    const settings = runtime.getSettings();
+    const shortcutKey = normalizeShortcutKey(settings.shortcutKey) ?? DEFAULT_SHORTCUT_KEY;
+    const shouldUseCustomEditor =
+      settings.enabled && settings.shortcutEnabled && shortcutKey !== DEFAULT_SHORTCUT_KEY;
+
+    if (!shouldUseCustomEditor) {
+      clearEditorComponent(ctx);
+      return;
+    }
+
+    if (ownsEditorComponent && installedCustomShortcutKey === shortcutKey) {
+      return;
+    }
+
+    installedCustomShortcutKey = shortcutKey;
+    activeCustomShortcutKey = undefined;
+    ownsEditorComponent = true;
+    ctx.ui.setEditorComponent((tui, theme, keybindings) => {
+      const currentShortcutKey =
+        normalizeShortcutKey(runtime.getSettings().shortcutKey) ?? DEFAULT_SHORTCUT_KEY;
+      activeCustomShortcutKey = findShortcutConflictAction(
+        currentShortcutKey,
+        keybindings.getEffectiveConfig()
+      )
+        ? undefined
+        : currentShortcutKey;
+
+      return new PromptsmithEditor(
+        tui,
+        theme,
+        keybindings,
+        () => runtime.getSettings(),
+        () => {
+          void handlePromptsmithShortcut(ctx, runtime, {
+            completeFn: options?.completeFn ?? complete,
+            exec: pi.exec.bind(pi),
+            refreshStatus,
+            runCancellableTask: runEnhancementWithLoader,
+            openSettings,
+          });
+        }
+      );
+    });
+  };
 
   const refreshStatus = (ctx: ExtensionContext): void => {
+    applyEditorComponent(ctx);
     refreshStatusLine(ctx, runtime);
+  };
+
+  const openSettings = async (ctx: ExtensionContext): Promise<void> => {
+    await openSettingsUi(ctx, runtime, { refreshStatus });
+  };
+
+  const triggerDefaultShortcut = async (ctx: ExtensionContext): Promise<void> => {
+    const settings = runtime.getSettings();
+    if (
+      settings.enabled &&
+      settings.shortcutEnabled &&
+      activeCustomShortcutKey &&
+      activeCustomShortcutKey !== DEFAULT_SHORTCUT_KEY
+    ) {
+      ctx.ui.notify(
+        `Promptsmith shortcut is now ${formatShortcutKey(activeCustomShortcutKey)}.`,
+        "info"
+      );
+      return;
+    }
+
+    await handlePromptsmithShortcut(ctx, runtime, {
+      completeFn: options?.completeFn ?? complete,
+      exec: pi.exec.bind(pi),
+      refreshStatus,
+      runCancellableTask: runEnhancementWithLoader,
+      openSettings,
+    });
   };
 
   const restorePersistedSettings = (ctx: ExtensionContext): void => {
@@ -43,6 +142,9 @@ export function createPromptsmithExtension(
   pi.on("model_select", (_event, ctx) => {
     refreshStatus(ctx);
   });
+  pi.on("session_shutdown", (_event, ctx) => {
+    clearEditorComponent(ctx);
+  });
 
   pi.registerCommand(EXTENSION_COMMAND, {
     description: "Enhance the current editor prompt in-place",
@@ -57,18 +159,10 @@ export function createPromptsmithExtension(
     },
   });
 
-  pi.registerShortcut(SHORTCUT_KEY, {
+  pi.registerShortcut(DEFAULT_SHORTCUT_KEY, {
     description: "Enhance the current editor prompt",
     handler: async (ctx) => {
-      await handlePromptsmithShortcut(ctx, runtime, {
-        completeFn: options?.completeFn ?? complete,
-        exec: pi.exec.bind(pi),
-        refreshStatus,
-        runCancellableTask: runEnhancementWithLoader,
-        openSettings: async (settingsCtx) => {
-          await openSettingsUi(settingsCtx, runtime, { refreshStatus });
-        },
-      });
+      await triggerDefaultShortcut(ctx);
     },
   });
 }

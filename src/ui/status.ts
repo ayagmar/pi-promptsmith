@@ -1,5 +1,6 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { EXTENSION_COMMAND, EXTENSION_NAME, MAX_STATUS_MODEL_ID_LENGTH } from "../constants.js";
+import { formatShortcutKey } from "../shortcut-key.js";
 import { buildEnhancerModeLabel } from "../enhance.js";
 import { analyzeDraftIntent } from "../intent.js";
 import { describeResolvedFamily, resolveTargetFamily } from "../model-routing.js";
@@ -72,6 +73,7 @@ export function buildStatusReport(ctx: ExtensionContext, runtime: PromptsmithRun
       : []),
     `enabled: ${settings.enabled}`,
     `shortcut enabled: ${settings.shortcutEnabled}`,
+    `shortcut key: ${formatShortcutKey(settings.shortcutKey)}`,
     `status bar enabled: ${settings.statusBarEnabled}`,
     `include recent conversation: ${settings.includeRecentConversation}`,
     `include project metadata: ${settings.includeProjectMetadata}`,

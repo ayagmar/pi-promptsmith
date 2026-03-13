@@ -33,7 +33,7 @@ pi install git:github.com/ayagmar/pi-promptsmith
 
 Write a rough request in the Pi editor, then:
 
-- press `Alt+P`, or
+- press `Alt+P` by default (or your custom Promptsmith shortcut), or
 - run `/promptsmith`
 
 Promptsmith rewrites the current draft directly in the editor.
@@ -176,6 +176,8 @@ Inside the interactive settings and model pickers:
 - large model lists are paginated to stay compact
 - press `/` to open search in the compact selector
 - `PageUp` / `PageDown` switch pages in paginated selectors
+- the keyboard shortcut row lets you turn the shortcut on or off, remap it, or reset it to `Alt+P`
+- when remapping, press the new key combo directly; `Esc` cancels and `Backspace` resets to default
 
 Quick config:
 
@@ -208,6 +210,7 @@ Promptsmith saves global settings in:
 
 Important defaults:
 
+- keyboard shortcut = `Alt+P`
 - rewrite mode = `auto`
 - rewrite strength = `balanced`
 - status bar = `off`

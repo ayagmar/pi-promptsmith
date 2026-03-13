@@ -86,6 +86,30 @@ void test("shortcut with empty editor opens settings", async () => {
   assert.deepEqual(ctx.uiState.selectTitles, ["Promptsmith settings"]);
 });
 
+void test("configured shortcut still enhances when invoked through the custom editor path", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({
+    model: createModel(),
+    editorText: "rough draft",
+  });
+
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    shortcutKey: "ctrl+alt+p",
+  });
+
+  await handlePromptsmithShortcut(
+    ctx,
+    runtime,
+    createShortcutServices(harness, ctx, () =>
+      Promise.resolve(createCompleteResponse("Sharper prompt"))
+    )
+  );
+
+  assert.equal(ctx.uiState.editorText, "Sharper prompt");
+});
+
 void test("shortcut expands Pi paste markers from the clipboard before enhancement", async () => {
   const runtime = createRuntimeState();
   const ctx = createCommandContext({
@@ -125,11 +149,12 @@ void test("settings ui shows clearer labels and the footer status toggle", async
 
   const firstMenu = ctx.uiState.customOptionsHistory[0] ?? [];
   assert.ok(firstMenu.some((option) => /Prompt enhancement · On/i.test(option)));
+  assert.ok(firstMenu.some((option) => /Keyboard shortcut · On · Alt\+P/i.test(option)));
   assert.ok(firstMenu.some((option) => /Footer status bar · Off/i.test(option)));
   assert.ok(firstMenu.some((option) => /Rewrite mode · Auto/i.test(option)));
 
   const initialRender = ctx.uiState.customRenderHistory[0]?.join("\n") ?? "";
-  assert.match(initialRender, /Master switch for \/promptsmith and Alt\+P/i);
+  assert.match(initialRender, /Master switch for \/promptsmith and the keyboard shortcut/i);
 });
 
 void test("default enhancement skips recent conversation context for speed", async () => {

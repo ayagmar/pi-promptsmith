@@ -41,6 +41,7 @@ export interface PromptsmithSettings {
   version: 1;
   enabled: boolean;
   shortcutEnabled: boolean;
+  shortcutKey: string;
   targetFamilyMode: PromptsmithTargetFamilyMode;
   fallbackFamily: PromptsmithFamily;
   exactModelOverrides: ExactModelOverride[];

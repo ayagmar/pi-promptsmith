@@ -203,6 +203,7 @@ void test("settings persist across sessions globally", () => {
     ...runtime.getSettings(),
     enabled: false,
     statusBarEnabled: true,
+    shortcutKey: "ctrl+alt+p",
     rewriteMode: "plain",
     enhancementTimeoutMs: 12_000,
   });
@@ -212,6 +213,7 @@ void test("settings persist across sessions globally", () => {
 
   assert.equal(restoredRuntime.getSettings().enabled, false);
   assert.equal(restoredRuntime.getSettings().statusBarEnabled, true);
+  assert.equal(restoredRuntime.getSettings().shortcutKey, "ctrl+alt+p");
   assert.equal(restoredRuntime.getSettings().rewriteMode, "plain");
   assert.equal(restoredRuntime.getSettings().enhancementTimeoutMs, 12_000);
 });
@@ -236,6 +238,16 @@ void test("failed global settings writes do not claim success or corrupt runtime
 
 void test("sanitizeSettings rejects unknown schema versions", () => {
   assert.equal(sanitizeSettings({ version: 2 }), undefined);
+});
+
+void test("sanitizeSettings normalizes shortcut keys and falls back on unsafe values", () => {
+  const normalized = sanitizeSettings({ version: 1, shortcutKey: "Alt + Shift + P" });
+  const invalidFormatFallback = sanitizeSettings({ version: 1, shortcutKey: "plain-p" });
+  const unsafeTypingFallback = sanitizeSettings({ version: 1, shortcutKey: "shift+p" });
+
+  assert.equal(normalized?.shortcutKey, "shift+alt+p");
+  assert.equal(invalidFormatFallback?.shortcutKey, "alt+p");
+  assert.equal(unsafeTypingFallback?.shortcutKey, "alt+p");
 });
 
 void test("sanitizeSettings dedupes exact and pattern overrides by normalized key", () => {

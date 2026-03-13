@@ -31,6 +31,7 @@ export interface MockUiState {
   customOptionsHistory: string[][];
   customRenderHistory: string[][];
   customInputSequence: string[];
+  editorComponentHistory: ("set" | "clear")[];
   themeCount: number;
 }
 
@@ -115,6 +116,7 @@ export function createCommandContext(options?: {
     customOptionsHistory: [],
     customRenderHistory: [],
     customInputSequence: [...(options?.customInputSequence ?? [])],
+    editorComponentHistory: [],
     themeCount: options?.themeCount ?? 1,
   };
 
@@ -206,10 +208,10 @@ export function createCommandContext(options?: {
                     bg: (color: string, text: string) => string;
                     bold: (text: string) => string;
                   },
-                  keybindings: unknown,
+                  keybindings: { getEffectiveConfig: () => Record<string, string | string[]> },
                   done: (value: unknown) => void
                 ) => { render?: (width: number) => string[]; handleInput?: (data: string) => void }
-              )({ requestRender: captureRender }, theme, undefined, done)
+              )({ requestRender: captureRender }, theme, { getEffectiveConfig: () => ({}) }, done)
             : factory;
 
         customComponent = component as {
@@ -276,7 +278,9 @@ export function createCommandContext(options?: {
       pasteToEditor: (text: string) => {
         uiState.editorText = text;
       },
-      setEditorComponent: () => undefined,
+      setEditorComponent: (factory: unknown) => {
+        uiState.editorComponentHistory.push(factory ? "set" : "clear");
+      },
       theme: {
         fg: (_color: string, text: string) => text,
         bg: (_color: string, text: string) => text,
