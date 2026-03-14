@@ -111,6 +111,14 @@ export interface PromptsmithDraftResolution {
   effectiveRewriteMode: PromptsmithEffectiveRewriteMode;
 }
 
+export interface PromptsmithEnhancementAttempt {
+  outcome: "success" | "cancelled" | "failed";
+  enhancerModel?: ModelRef;
+  retryUsed: boolean;
+  recoveredAfterRetry: boolean;
+  detail?: string;
+}
+
 export interface PromptsmithStatusSnapshot {
   settings: PromptsmithSettings;
   activeModel?: ModelRef;
@@ -120,6 +128,7 @@ export interface PromptsmithStatusSnapshot {
   undoAvailable: boolean;
   currentDraftResolution?: PromptsmithDraftResolution;
   lastDraftResolution?: PromptsmithDraftResolution;
+  lastEnhancementAttempt?: PromptsmithEnhancementAttempt;
 }
 
 export interface PromptsmithRuntimeSupport {

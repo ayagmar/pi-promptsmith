@@ -9,6 +9,7 @@ import { handlePromptsmithShortcut } from "../src/shortcut.js";
 import { openSettingsUi } from "../src/ui/settings.js";
 import {
   createAssistantEntry,
+  createAssistantResponse,
   createCommandContext,
   createCompleteResponse,
   createMockPi,
@@ -205,6 +206,28 @@ void test("preview mode uses the review editor before replacing text", async () 
   );
 
   assert.equal(ctx.uiState.editorText, "Reviewed prompt");
+  assert.equal(runtime.getLastEnhancementAttempt()?.outcome, "success");
+});
+
+void test("preview cancellation records a cancelled enhancement attempt", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({
+    model: createModel(),
+    editorText: "draft",
+  });
+
+  runtime.replaceSettings({ ...runtime.getSettings(), previewBeforeReplace: true });
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("Enhanced prompt")))
+  );
+
+  assert.equal(ctx.uiState.editorText, "draft");
+  assert.equal(runtime.getLastEnhancementAttempt()?.outcome, "cancelled");
 });
 
 void test("cancelled enhancement leaves the editor unchanged", async () => {
@@ -232,6 +255,43 @@ void test("failed enhancement leaves the editor unchanged", async () => {
 
   assert.equal(ctx.uiState.editorText, "original draft");
   assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /bad output/);
+});
+
+void test("invalid model output errors include model-specific diagnostics", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel(), editorText: "original draft" });
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(
+      harness,
+      (() => {
+        let callCount = 0;
+        return () => {
+          callCount += 1;
+          return Promise.resolve(
+            callCount === 1
+              ? createAssistantResponse("Sure — here is the rewrite")
+              : createAssistantResponse(
+                  "<promptsmith-enhanced-prompt>usable</promptsmith-enhanced-prompt> extra note"
+                )
+          );
+        };
+      })()
+    )
+  );
+
+  const message = ctx.uiState.notifications.at(-1)?.message ?? "";
+  assert.equal(ctx.uiState.editorText, "original draft");
+  assert.match(message, /enhancer model active \(openai\/gpt-5\) returned invalid output twice/i);
+  assert.match(message, /primary failure: missing sentinel block/i);
+  assert.match(message, /retry failure: unexpected text outside the sentinel block/i);
+  assert.match(message, /primary response preview: sure — here is the rewrite/i);
+  assert.match(message, /retry response preview:/i);
+  assert.match(message, /try \/promptsmith status/i);
 });
 
 void test("hung enhancement times out and leaves the editor unchanged", async () => {

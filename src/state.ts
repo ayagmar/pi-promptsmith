@@ -15,6 +15,7 @@ import type {
   FamilyOverride,
   ModelRef,
   PromptsmithDraftResolution,
+  PromptsmithEnhancementAttempt,
   PromptsmithSettings,
 } from "./types.js";
 import { UndoManager } from "./undo.js";
@@ -23,6 +24,7 @@ export class PromptsmithRuntimeState {
   private settings: PromptsmithSettings = cloneSettings(DEFAULT_SETTINGS);
   private busy = false;
   private lastDraftResolution: PromptsmithDraftResolution | undefined;
+  private lastEnhancementAttempt: PromptsmithEnhancementAttempt | undefined;
   readonly undo = new UndoManager();
 
   constructor(private readonly settingsPath = getGlobalSettingsPath()) {}
@@ -46,6 +48,7 @@ export class PromptsmithRuntimeState {
     const restoredSettings = restoreSettingsFromDisk(this.settingsPath);
     this.replaceSettings(restoredSettings ?? cloneSettings(DEFAULT_SETTINGS));
     this.busy = false;
+    this.lastEnhancementAttempt = undefined;
     this.undo.clear();
   }
 
@@ -55,6 +58,24 @@ export class PromptsmithRuntimeState {
 
   rememberDraftResolution(resolution: PromptsmithDraftResolution): void {
     this.lastDraftResolution = { ...resolution };
+  }
+
+  getLastEnhancementAttempt(): PromptsmithEnhancementAttempt | undefined {
+    return this.lastEnhancementAttempt
+      ? {
+          ...this.lastEnhancementAttempt,
+          ...(this.lastEnhancementAttempt.enhancerModel
+            ? { enhancerModel: { ...this.lastEnhancementAttempt.enhancerModel } }
+            : {}),
+        }
+      : undefined;
+  }
+
+  rememberEnhancementAttempt(attempt: PromptsmithEnhancementAttempt): void {
+    this.lastEnhancementAttempt = {
+      ...attempt,
+      ...(attempt.enhancerModel ? { enhancerModel: { ...attempt.enhancerModel } } : {}),
+    };
   }
 
   isBusy(): boolean {

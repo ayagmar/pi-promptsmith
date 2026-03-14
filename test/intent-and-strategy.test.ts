@@ -259,6 +259,28 @@ void test("status line reflects the current draft analysis when enabled", () => 
   assert.match(line, /mode: auto → execution-contract\/review/);
 });
 
+void test("status line surfaces the last failed enhancement", () => {
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({ ...runtime.getSettings(), statusBarEnabled: true });
+  runtime.rememberEnhancementAttempt({
+    outcome: "failed",
+    enhancerModel: { provider: "openai", id: "gpt-5" },
+    retryUsed: true,
+    recoveredAfterRetry: false,
+    detail: "primary: missing sentinel block; retry: unexpected text outside the sentinel block",
+  });
+  const ctx = createCommandContext({
+    model: createModel(),
+    editorText: "Review this implementation and report findings.",
+  });
+
+  refreshStatusLine(ctx, runtime);
+
+  const line = ctx.uiState.status.get("promptsmith");
+  assert.ok(line);
+  assert.match(line, /last: failed/);
+});
+
 void test("status line clears when the footer status setting is turned off", () => {
   const runtime = createRuntimeState();
   runtime.replaceSettings({ ...runtime.getSettings(), statusBarEnabled: true });
@@ -310,6 +332,28 @@ void test("status report reuses the last analyzed draft resolution outside inter
   assert.match(report, /task intent: unavailable outside interactive editor mode/);
   assert.match(report, /last analyzed effective rewrite mode: execution-contract/);
   assert.match(report, /last analyzed task intent: implement/);
+});
+
+void test("status report includes the last enhancement attempt details", () => {
+  const runtime = createRuntimeState();
+  runtime.rememberEnhancementAttempt({
+    outcome: "failed",
+    enhancerModel: { provider: "google-gemini-cli", id: "gemini-3.1-pro-preview" },
+    retryUsed: true,
+    recoveredAfterRetry: false,
+    detail: "primary: missing sentinel block;\nretry: unexpected text outside the sentinel block",
+  });
+  const ctx = createCommandContext({ model: createModel(), editorText: "Implement this." });
+
+  const report = buildStatusReport(ctx, runtime);
+
+  assert.match(report, /last enhancement outcome: failed/);
+  assert.match(report, /last enhancement model: google-gemini-cli\/gemini-3.1-pro-preview/);
+  assert.match(report, /last enhancement retry: retry used but did not recover/);
+  assert.match(
+    report,
+    /last enhancement detail: primary: missing sentinel block; retry: unexpected text outside the sentinel block/
+  );
 });
 
 function createPromptContext(

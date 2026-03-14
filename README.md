@@ -250,6 +250,8 @@ There are two ways to see status:
 - resolved target family
 - timeout
 - current draft intent and effective rewrite mode, when the editor is readable
+- the last enhancement outcome, enhancer model, and whether a format-retry was needed
+- the last enhancement failure detail when a model breaks the sentinel contract
 
 Outside interactive editor mode, draft-aware status degrades gracefully.
 
@@ -285,6 +287,8 @@ Promptsmith keeps a few important guarantees:
 - preview mode lets you review before replace
 - only one enhancement runs at a time
 - output must contain exactly one sentinel block
+- invalid model-output failures say whether the model missed the sentinel, emitted multiple blocks, added extra text, or returned an empty block
+- a bad first model response is retried once with a stricter format reminder before Promptsmith fails closed
 - single collapsed Pi paste markers can be recovered from the clipboard; multi-marker drafts fail closed
 - oversized drafts fail clearly instead of being truncated silently
 - intent detection is local and deterministic; it does not use a second model call

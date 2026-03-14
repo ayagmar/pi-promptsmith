@@ -34,7 +34,9 @@ export function buildStatusLine(snapshot: PromptsmithStatusSnapshot): string {
     ? `${snapshot.settings.rewriteMode} → ${snapshot.currentDraftResolution.effectiveRewriteMode}/${snapshot.currentDraftResolution.intent}`
     : snapshot.settings.rewriteMode;
   const undo = snapshot.undoAvailable ? " | undo: ready" : "";
-  return `${busyPrefix}Promptsmith: ${family} | mode: ${rewriteMode} | enhancer: ${truncate(snapshot.enhancerModeLabel)}${undo}`;
+  const lastFailure =
+    snapshot.lastEnhancementAttempt?.outcome === "failed" ? " | last: failed" : "";
+  return `${busyPrefix}Promptsmith: ${family} | mode: ${rewriteMode} | enhancer: ${truncate(snapshot.enhancerModeLabel)}${undo}${lastFailure}`;
 }
 
 export function buildStatusReport(ctx: ExtensionContext, runtime: PromptsmithRuntimeState): string {
@@ -57,6 +59,7 @@ export function buildStatusReport(ctx: ExtensionContext, runtime: PromptsmithRun
     : snapshot.currentDraftResolution
       ? snapshot.currentDraftResolution.intent
       : "unavailable (editor empty)";
+  const lastEnhancement = snapshot.lastEnhancementAttempt;
 
   return [
     buildStatusLine(snapshot),
@@ -69,6 +72,16 @@ export function buildStatusReport(ctx: ExtensionContext, runtime: PromptsmithRun
       ? [
           `last analyzed effective rewrite mode: ${snapshot.lastDraftResolution.effectiveRewriteMode}`,
           `last analyzed task intent: ${snapshot.lastDraftResolution.intent}`,
+        ]
+      : []),
+    ...(lastEnhancement
+      ? [
+          `last enhancement outcome: ${lastEnhancement.outcome}`,
+          `last enhancement model: ${lastEnhancement.enhancerModel ? `${lastEnhancement.enhancerModel.provider}/${lastEnhancement.enhancerModel.id}` : "unknown"}`,
+          `last enhancement retry: ${describeRetryStatus(lastEnhancement)}`,
+          ...(lastEnhancement.detail
+            ? [`last enhancement detail: ${formatStatusDetail(lastEnhancement.detail)}`]
+            : []),
         ]
       : []),
     `enabled: ${settings.enabled}`,
@@ -103,6 +116,7 @@ function createStatusSnapshot(
   }
 
   const lastDraftResolution = runtime.getLastDraftResolution();
+  const lastEnhancementAttempt = runtime.getLastEnhancementAttempt();
 
   return {
     settings,
@@ -113,7 +127,26 @@ function createStatusSnapshot(
     undoAvailable: runtime.undo.hasUndo(),
     ...(currentDraftResolution ? { currentDraftResolution } : {}),
     ...(lastDraftResolution ? { lastDraftResolution } : {}),
+    ...(lastEnhancementAttempt ? { lastEnhancementAttempt } : {}),
   };
+}
+
+function describeRetryStatus(
+  snapshot: NonNullable<PromptsmithStatusSnapshot["lastEnhancementAttempt"]>
+): string {
+  if (snapshot.recoveredAfterRetry) {
+    return "recovered after one retry";
+  }
+
+  if (snapshot.retryUsed) {
+    return "retry used but did not recover";
+  }
+
+  return "not needed";
+}
+
+function formatStatusDetail(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function truncate(value: string): string {

@@ -331,9 +331,17 @@ void test("runtime restore clears transient undo state", () => {
     intent: "implement",
     effectiveRewriteMode: "execution-contract",
   });
+  runtime.rememberEnhancementAttempt({
+    outcome: "failed",
+    enhancerModel: { provider: "openai", id: "gpt-5" },
+    retryUsed: true,
+    recoveredAfterRetry: false,
+    detail: "primary: missing sentinel block; retry: unexpected text outside the sentinel block",
+  });
 
   runtime.restoreSettings();
 
   assert.equal(runtime.undo.hasUndo(), false);
   assert.equal(runtime.getLastDraftResolution(), undefined);
+  assert.equal(runtime.getLastEnhancementAttempt(), undefined);
 });
