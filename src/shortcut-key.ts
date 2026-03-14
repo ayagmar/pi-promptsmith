@@ -71,9 +71,7 @@ const SYMBOL_KEYS = new Set<string>([
 ]);
 const DISPLAY_NAMES: Record<string, string> = {
   escape: "Escape",
-  esc: "Esc",
   enter: "Enter",
-  return: "Return",
   tab: "Tab",
   space: "Space",
   backspace: "Backspace",
@@ -89,6 +87,29 @@ const DISPLAY_NAMES: Record<string, string> = {
   left: "Left",
   right: "Right",
 };
+const VALID_KEY_ID_SPECIAL_KEYS = new Set<string>([
+  "escape",
+  "enter",
+  "tab",
+  "space",
+  "backspace",
+  "delete",
+  "home",
+  "end",
+  "pageup",
+  "pagedown",
+  "up",
+  "down",
+  "left",
+  "right",
+]);
+
+interface ShortcutParts {
+  modifiers: string[];
+  key: string;
+}
+
+type EffectiveKeybindings = Record<string, string | string[]>;
 
 export function normalizeShortcutKey(value: string | undefined): string | undefined {
   const parts = parseShortcutParts(value);
@@ -112,8 +133,6 @@ export function normalizeShortcutKey(value: string | undefined): string | undefi
   const orderedModifiers = MODIFIER_ORDER.filter((modifier) => modifierSet.has(modifier));
   return [...orderedModifiers, key].join("+");
 }
-
-type EffectiveKeybindings = Record<string, string | string[]>;
 
 export function validateShortcutKey(
   value: string,
@@ -167,16 +186,15 @@ export function findShortcutConflictAction(
 }
 
 export function formatShortcutKey(value: string | undefined): string {
-  const normalized = normalizeShortcutKey(value) ?? DEFAULT_SHORTCUT_KEY;
-  const parts = parseShortcutParts(normalized);
-  if (!parts) {
-    return formatShortcutKey(DEFAULT_SHORTCUT_KEY);
+  const normalized = normalizeShortcutKey(value);
+  const parts = normalized ? parseShortcutParts(normalized) : undefined;
+  if (parts) {
+    return formatShortcutParts(parts);
   }
 
-  return [
-    ...parts.modifiers.map((modifier) => formatShortcutToken(modifier, false)),
-    formatShortcutToken(parts.key, true),
-  ].join("+");
+  const fallbackNormalized = normalizeShortcutKey(DEFAULT_SHORTCUT_KEY);
+  const fallbackParts = fallbackNormalized ? parseShortcutParts(fallbackNormalized) : undefined;
+  return fallbackParts ? formatShortcutParts(fallbackParts) : DEFAULT_SHORTCUT_KEY;
 }
 
 export function isDefaultShortcutConfigured(settings: PromptsmithSettings): boolean {
@@ -197,16 +215,52 @@ export function matchesCustomShortcut(
     return false;
   }
 
+  if (!isValidKeyId(shortcutKey)) {
+    return false;
+  }
+
   if (findShortcutConflictAction(shortcutKey, effectiveKeybindings)) {
     return false;
   }
 
-  return matchesKey(data, shortcutKey as KeyId);
+  return matchesKey(data, shortcutKey);
 }
 
-function parseShortcutParts(
-  value: string | undefined
-): { modifiers: string[]; key: string } | undefined {
+function isValidKeyId(value: string): value is KeyId {
+  const parts = parseShortcutParts(value);
+  if (!parts) {
+    return false;
+  }
+
+  const modifierSet = new Set(parts.modifiers);
+  if (modifierSet.size !== parts.modifiers.length) {
+    return false;
+  }
+
+  for (const modifier of modifierSet) {
+    if (!MODIFIERS.has(modifier)) {
+      return false;
+    }
+  }
+
+  const hasCtrl = modifierSet.has("ctrl");
+  const hasAlt = modifierSet.has("alt");
+  if (!hasCtrl && !hasAlt) {
+    return false;
+  }
+
+  if (SYMBOL_KEYS.has(parts.key)) {
+    return false;
+  }
+
+  if (/^[a-z]$/.test(parts.key)) {
+    return true;
+  }
+
+  return VALID_KEY_ID_SPECIAL_KEYS.has(parts.key);
+}
+
+function parseShortcutParts(value: string | undefined): ShortcutParts | undefined {
   if (!value) {
     return undefined;
   }
@@ -263,6 +317,13 @@ function normalizeBaseKey(value: string | undefined): string | undefined {
   }
 
   return SYMBOL_KEYS.has(value) ? value : undefined;
+}
+
+function formatShortcutParts(parts: ShortcutParts): string {
+  return [
+    ...parts.modifiers.map((modifier) => formatShortcutToken(modifier, false)),
+    formatShortcutToken(parts.key, true),
+  ].join("+");
 }
 
 function formatShortcutToken(token: string, isKey: boolean): string {

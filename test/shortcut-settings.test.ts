@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   findShortcutConflictAction,
   formatShortcutKey,
+  matchesCustomShortcut,
   normalizeShortcutKey,
   validateShortcutKey,
 } from "../src/shortcut-key.js";
@@ -31,6 +32,16 @@ void test("shortcut conflict lookup finds matching built-in actions", () => {
     "cycleModelForward"
   );
   assert.equal(findShortcutConflictAction("alt+p", { submit: "enter" }), undefined);
+});
+
+void test("matchesCustomShortcut ignores invalid persisted shortcuts", () => {
+  const runtime = createRuntimeState();
+  const settings = {
+    ...runtime.getSettings(),
+    shortcutKey: "shift+tab",
+  };
+
+  assert.equal(matchesCustomShortcut("\u001b[Z", settings, { submit: "enter" }), false);
 });
 
 void test("status report includes the configured shortcut key", () => {
