@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/ayagmar/pi-promptsmith/compare/v0.2.1...v0.3.0) (2026-03-21)
+
+### Features
+
+* **promptsmith:** add auto-send settings and update Pi keybindings ([fd89c02](https://github.com/ayagmar/pi-promptsmith/commit/fd89c0208816b02798303ac28c430cfd515a1dd9))
+* **promptsmith:** add customizable keyboard shortcuts ([64fd3fd](https://github.com/ayagmar/pi-promptsmith/commit/64fd3fd489f1f6119a6e113d14f11d1ff16dfc37))
+
+### Bug Fixes
+
+* **promptsmith:** guard default shortcut and sync key hints ([42dd381](https://github.com/ayagmar/pi-promptsmith/commit/42dd381302102abc4980f89b63a019d47ed81d21))
+* **promptsmith:** improve enhancement failure observability ([702ddfe](https://github.com/ayagmar/pi-promptsmith/commit/702ddfeefbbedd6eb9a572923d887b580f57c493))
+* **shortcut:** validate custom shortcut key ids ([e65d6a4](https://github.com/ayagmar/pi-promptsmith/commit/e65d6a486b5ef6d24aa2d6edd7271863ca9cfc14))
+
 ## [0.2.1](https://github.com/ayagmar/pi-promptsmith/compare/v0.2.0...v0.2.1) (2026-03-12)
 
 ## 0.2.0 (2026-03-12)
