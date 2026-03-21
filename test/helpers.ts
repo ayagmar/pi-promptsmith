@@ -8,6 +8,7 @@ import type {
   ExtensionContext,
   SessionEntry,
 } from "@mariozechner/pi-coding-agent";
+import { matchesKey } from "@mariozechner/pi-tui";
 import { SENTINEL_CLOSE, SENTINEL_OPEN } from "../src/constants.js";
 import { PromptsmithRuntimeState } from "../src/state.js";
 
@@ -16,6 +17,10 @@ export interface MockPiHarness {
   commands: Map<string, { handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> }>;
   shortcuts: Map<string, { handler: (ctx: ExtensionContext) => Promise<void> | void }>;
   events: Map<string, ((event: unknown, ctx: ExtensionContext) => unknown)[]>;
+  userMessages: {
+    content: string;
+    options: { deliverAs?: "steer" | "followUp" } | undefined;
+  }[];
 }
 
 export interface MockUiState {
@@ -31,7 +36,98 @@ export interface MockUiState {
   customOptionsHistory: string[][];
   customRenderHistory: string[][];
   customInputSequence: string[];
+  editorComponentHistory: ("set" | "clear")[];
   themeCount: number;
+}
+
+type MockKeybindingsConfig = Record<string, string | string[] | undefined>;
+
+const DEFAULT_KEYBINDINGS: MockKeybindingsConfig = {
+  "tui.editor.cursorUp": "up",
+  "tui.editor.cursorDown": "down",
+  "tui.editor.cursorLeft": ["left", "ctrl+b"],
+  "tui.editor.cursorRight": ["right", "ctrl+f"],
+  "tui.editor.cursorWordLeft": ["alt+left", "ctrl+left", "alt+b"],
+  "tui.editor.cursorWordRight": ["alt+right", "ctrl+right", "alt+f"],
+  "tui.editor.cursorLineStart": ["home", "ctrl+a"],
+  "tui.editor.cursorLineEnd": ["end", "ctrl+e"],
+  "tui.editor.jumpForward": "ctrl+]",
+  "tui.editor.jumpBackward": "ctrl+alt+]",
+  "tui.editor.pageUp": "pageUp",
+  "tui.editor.pageDown": "pageDown",
+  "tui.editor.deleteCharBackward": "backspace",
+  "tui.editor.deleteCharForward": ["delete", "ctrl+d"],
+  "tui.editor.deleteWordBackward": ["ctrl+w", "alt+backspace"],
+  "tui.editor.deleteWordForward": ["alt+d", "alt+delete"],
+  "tui.editor.deleteToLineStart": "ctrl+u",
+  "tui.editor.deleteToLineEnd": "ctrl+k",
+  "tui.editor.yank": "ctrl+y",
+  "tui.editor.yankPop": "alt+y",
+  "tui.editor.undo": "ctrl+-",
+  "tui.input.newLine": "shift+enter",
+  "tui.input.submit": "enter",
+  "tui.input.tab": "tab",
+  "tui.input.copy": "ctrl+c",
+  "tui.select.up": "up",
+  "tui.select.down": "down",
+  "tui.select.pageUp": "pageUp",
+  "tui.select.pageDown": "pageDown",
+  "tui.select.confirm": "enter",
+  "tui.select.cancel": ["escape", "ctrl+c"],
+  "app.interrupt": "escape",
+  "app.clear": "ctrl+c",
+  "app.exit": "ctrl+d",
+  "app.suspend": "ctrl+z",
+  "app.thinking.cycle": "shift+tab",
+  "app.model.cycleForward": "ctrl+p",
+  "app.model.cycleBackward": "shift+ctrl+p",
+  "app.model.select": "ctrl+l",
+  "app.tools.expand": "ctrl+o",
+  "app.thinking.toggle": "ctrl+t",
+  "app.session.toggleNamedFilter": "ctrl+n",
+  "app.editor.external": "ctrl+g",
+  "app.message.followUp": "alt+enter",
+  "app.message.dequeue": "alt+up",
+  "app.clipboard.pasteImage": "ctrl+v",
+  "app.session.new": [],
+  "app.session.tree": [],
+  "app.session.fork": [],
+  "app.session.resume": [],
+  "app.tree.foldOrUp": ["ctrl+left", "alt+left"],
+  "app.tree.unfoldOrDown": ["ctrl+right", "alt+right"],
+  "app.session.togglePath": "ctrl+p",
+  "app.session.toggleSort": "ctrl+s",
+  "app.session.rename": "ctrl+r",
+  "app.session.delete": "ctrl+d",
+  "app.session.deleteNoninvasive": "ctrl+backspace",
+};
+
+export function createMockKeybindings(overrides?: MockKeybindingsConfig) {
+  const resolvedConfig = {
+    ...DEFAULT_KEYBINDINGS,
+    ...overrides,
+  };
+
+  return {
+    matches: (data: string, keybinding: string) => {
+      const keys = resolvedConfig[keybinding];
+      if (!keys) {
+        return false;
+      }
+
+      const keyList = Array.isArray(keys) ? keys : [keys];
+      return keyList.some((key) => matchesKey(data, key as Parameters<typeof matchesKey>[1]));
+    },
+    getKeys: (keybinding: string) => {
+      const keys = resolvedConfig[keybinding];
+      if (!keys) {
+        return [];
+      }
+
+      return Array.isArray(keys) ? [...keys] : [keys];
+    },
+    getEffectiveConfig: () => ({ ...resolvedConfig }),
+  };
 }
 
 export function createMockPi(): MockPiHarness {
@@ -41,6 +137,10 @@ export function createMockPi(): MockPiHarness {
   >();
   const shortcuts = new Map<string, { handler: (ctx: ExtensionContext) => Promise<void> | void }>();
   const events = new Map<string, ((event: unknown, ctx: ExtensionContext) => unknown)[]>();
+  const userMessages: {
+    content: string;
+    options: { deliverAs?: "steer" | "followUp" } | undefined;
+  }[] = [];
 
   const pi = {
     on: (eventName: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) => {
@@ -60,10 +160,18 @@ export function createMockPi(): MockPiHarness {
     ) => {
       shortcuts.set(name, shortcut);
     },
+    sendUserMessage: (
+      content: string,
+      options?: {
+        deliverAs?: "steer" | "followUp";
+      }
+    ) => {
+      userMessages.push({ content, options });
+    },
     exec: () => Promise.resolve({ stdout: "", stderr: "", code: 0, killed: false }),
   } as unknown as ExtensionAPI;
 
-  return { pi, commands, shortcuts, events };
+  return { pi, commands, shortcuts, events, userMessages };
 }
 
 export function createRuntimeState(): PromptsmithRuntimeState {
@@ -96,6 +204,7 @@ export function createCommandContext(options?: {
   nextInputValue?: string;
   customInputSequence?: string[];
   themeCount?: number;
+  keybindingsConfig?: MockKeybindingsConfig;
   model?: Model<Api>;
   entries?: SessionEntry[];
   allModels?: Model<Api>[];
@@ -115,6 +224,7 @@ export function createCommandContext(options?: {
     customOptionsHistory: [],
     customRenderHistory: [],
     customInputSequence: [...(options?.customInputSequence ?? [])],
+    editorComponentHistory: [],
     themeCount: options?.themeCount ?? 1,
   };
 
@@ -206,10 +316,19 @@ export function createCommandContext(options?: {
                     bg: (color: string, text: string) => string;
                     bold: (text: string) => string;
                   },
-                  keybindings: unknown,
+                  keybindings: {
+                    matches: (data: string, keybinding: string) => boolean;
+                    getKeys: (keybinding: string) => string[];
+                    getEffectiveConfig: () => Record<string, string | string[] | undefined>;
+                  },
                   done: (value: unknown) => void
                 ) => { render?: (width: number) => string[]; handleInput?: (data: string) => void }
-              )({ requestRender: captureRender }, theme, undefined, done)
+              )(
+                { requestRender: captureRender },
+                theme,
+                createMockKeybindings(options?.keybindingsConfig),
+                done
+              )
             : factory;
 
         customComponent = component as {
@@ -276,7 +395,9 @@ export function createCommandContext(options?: {
       pasteToEditor: (text: string) => {
         uiState.editorText = text;
       },
-      setEditorComponent: () => undefined,
+      setEditorComponent: (factory: unknown) => {
+        uiState.editorComponentHistory.push(factory ? "set" : "clear");
+      },
       theme: {
         fg: (_color: string, text: string) => text,
         bg: (_color: string, text: string) => text,

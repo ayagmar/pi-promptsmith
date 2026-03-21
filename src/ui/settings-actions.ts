@@ -18,10 +18,15 @@ import {
 } from "../overrides.js";
 import { cloneSettings } from "../state.js";
 import type { PromptsmithRuntimeState } from "../state.js";
+import { DEFAULT_SHORTCUT_KEY } from "../constants.js";
+import { formatShortcutKey, isDefaultShortcutConfigured } from "../shortcut-key.js";
 import type { ModelRef, PromptsmithFamily, PromptsmithSettings } from "../types.js";
 import { parseEnhancementTimeoutSeconds } from "../validation.js";
 import { openSelectDialog, type SelectDialogItem } from "./select-dialog.js";
+import { captureShortcutKey } from "./shortcut-capture.js";
 import {
+  AUTO_SEND_BUSY_BEHAVIOR_OPTIONS,
+  describeSelectedAutoSendBusyBehavior,
   describeSelectedEnhancerMode,
   describeSelectedRewriteMode,
   describeSelectedStrength,
@@ -29,6 +34,7 @@ import {
   ENHANCER_MODEL_OPTIONS,
   FAMILY_OPTIONS,
   formatTimeoutSeconds,
+  parseLabeledAutoSendBusyBehavior,
   parseLabeledEnhancerMode,
   parseLabeledRewriteMode,
   parseLabeledStrength,
@@ -47,7 +53,6 @@ interface SettingsActionContext {
   ctx: ExtensionContext;
   runtime: PromptsmithRuntimeState;
   services: SettingsUiServices;
-  settings: PromptsmithSettings;
 }
 
 type SettingsChange = PromptsmithSettings | ((current: PromptsmithSettings) => PromptsmithSettings);
@@ -58,7 +63,8 @@ export async function runSettingsAction(
   choice: Exclude<SettingsMenuOptionId, "done">,
   options: SettingsActionContext
 ): Promise<void> {
-  const { ctx, runtime, services, settings } = options;
+  const { ctx, runtime, services } = options;
+  const settings = runtime.getSettings();
 
   switch (choice) {
     case "enabled":
@@ -70,15 +76,62 @@ export async function runSettingsAction(
         (next) => `Promptsmith is now ${next.enabled ? "on" : "off"}.`
       );
       return;
-    case "shortcutEnabled":
-      persistSettings(
+    case "shortcutEnabled": {
+      const shortcutChoice = await selectOption(
         ctx,
-        runtime,
-        services,
-        (latest) => ({ ...latest, shortcutEnabled: !latest.shortcutEnabled }),
-        (next) => `Keyboard shortcut is now ${next.shortcutEnabled ? "on" : "off"}.`
+        "Keyboard shortcut",
+        [
+          "Change keybinding",
+          `${settings.shortcutEnabled ? "Turn shortcut off" : "Turn shortcut on"}`,
+          ...(!isDefaultShortcutConfigured(settings) ? ["Reset to Alt+P"] : []),
+          "Back",
+        ],
+        "Back"
       );
-      return;
+
+      switch (shortcutChoice) {
+        case undefined:
+        case "Back":
+          return;
+        case "Change keybinding": {
+          const shortcutKey = await captureShortcutKey(ctx, {
+            currentValue: settings.shortcutKey,
+          });
+          if (!shortcutKey) {
+            return;
+          }
+          persistSettings(
+            ctx,
+            runtime,
+            services,
+            (latest) => ({ ...latest, shortcutEnabled: true, shortcutKey }),
+            `Keyboard shortcut set to ${formatShortcutKey(shortcutKey)}.`
+          );
+          return;
+        }
+        case "Turn shortcut off":
+        case "Turn shortcut on":
+          persistSettings(
+            ctx,
+            runtime,
+            services,
+            (latest) => ({ ...latest, shortcutEnabled: !latest.shortcutEnabled }),
+            (next) => `Keyboard shortcut is now ${next.shortcutEnabled ? "on" : "off"}.`
+          );
+          return;
+        case "Reset to Alt+P":
+          persistSettings(
+            ctx,
+            runtime,
+            services,
+            (latest) => ({ ...latest, shortcutKey: DEFAULT_SHORTCUT_KEY }),
+            "Keyboard shortcut reset to Alt+P."
+          );
+          return;
+        default:
+          return;
+      }
+    }
     case "targetFamilyMode": {
       const mode = await selectOption(
         ctx,
@@ -308,6 +361,34 @@ export async function runSettingsAction(
         (next) => `Review before replace is now ${next.previewBeforeReplace ? "on" : "off"}.`
       );
       return;
+    case "autoSendEnhancedPrompt":
+      persistSettings(
+        ctx,
+        runtime,
+        services,
+        (latest) => ({ ...latest, autoSendEnhancedPrompt: !latest.autoSendEnhancedPrompt }),
+        (next) => `Auto-send refined prompt is now ${next.autoSendEnhancedPrompt ? "on" : "off"}.`
+      );
+      return;
+    case "autoSendBusyBehavior": {
+      const behavior = await selectOption(
+        ctx,
+        "Choose auto-send behavior while Pi is busy",
+        AUTO_SEND_BUSY_BEHAVIOR_OPTIONS,
+        describeSelectedAutoSendBusyBehavior(settings.autoSendBusyBehavior)
+      );
+      const nextBehavior = parseLabeledAutoSendBusyBehavior(behavior);
+      if (nextBehavior) {
+        persistSettings(
+          ctx,
+          runtime,
+          services,
+          (latest) => ({ ...latest, autoSendBusyBehavior: nextBehavior }),
+          `Auto-send while busy now uses ${nextBehavior === "followUp" ? "follow-up" : "steer"}.`
+        );
+      }
+      return;
+    }
     case "preserveCodeBlocks":
       persistSettings(
         ctx,

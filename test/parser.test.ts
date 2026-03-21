@@ -20,7 +20,7 @@ void test("parseEnhancedPrompt rejects multiple blocks", () => {
       parseEnhancedPrompt(
         `${SENTINEL_OPEN}one${SENTINEL_CLOSE}\n${SENTINEL_OPEN}two${SENTINEL_CLOSE}`
       ),
-    /exactly one sentinel block/i
+    /multiple sentinel blocks/i
   );
 });
 
@@ -28,5 +28,12 @@ void test("parseEnhancedPrompt rejects text outside the sentinel block", () => {
   assert.throws(
     () => parseEnhancedPrompt(`prefix ${SENTINEL_OPEN}prompt${SENTINEL_CLOSE}`),
     /outside the sentinel block/i
+  );
+});
+
+void test("parseEnhancedPrompt rejects empty sentinel blocks", () => {
+  assert.throws(
+    () => parseEnhancedPrompt(`${SENTINEL_OPEN}\n\n${SENTINEL_CLOSE}`),
+    /empty enhanced prompt/i
   );
 });

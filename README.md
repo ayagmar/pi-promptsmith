@@ -33,7 +33,7 @@ pi install git:github.com/ayagmar/pi-promptsmith
 
 Write a rough request in the Pi editor, then:
 
-- press `Alt+P`, or
+- press `Alt+P` by default (or your custom Promptsmith shortcut), or
 - run `/promptsmith`
 
 Promptsmith rewrites the current draft directly in the editor.
@@ -176,6 +176,10 @@ Inside the interactive settings and model pickers:
 - large model lists are paginated to stay compact
 - press `/` to open search in the compact selector
 - `PageUp` / `PageDown` switch pages in paginated selectors
+- the keyboard shortcut row lets you turn the shortcut on or off, remap it, or reset it to `Alt+P`
+- you can toggle auto-send if you want Promptsmith to submit the refined prompt immediately after rewriting
+- if auto-send is on, you can choose whether a busy Pi session gets the refined prompt as a steer message or a follow-up
+- when remapping, press the new key combo directly; `Esc` cancels and `Backspace` resets to default
 
 Quick config:
 
@@ -195,6 +199,8 @@ Quick config:
 - `/promptsmith status-bar on|off`
 - `/promptsmith strength light|balanced|strong`
 - `/promptsmith preview on|off`
+- `/promptsmith auto-send on|off`
+- `/promptsmith auto-send-when-busy steer|follow-up`
 - `/promptsmith preserve-code on|off`
 - `/promptsmith timeout <seconds>`
 
@@ -208,12 +214,15 @@ Promptsmith saves global settings in:
 
 Important defaults:
 
+- keyboard shortcut = `Alt+P`
 - rewrite mode = `auto`
 - rewrite strength = `balanced`
 - status bar = `off`
 - recent conversation = `off`
 - project metadata = `off`
 - preview before replace = `false`
+- auto-send refined prompt = `false`
+- auto-send while busy = `steer`
 - preserve code blocks = `true`
 - enhancement timeout = `45s`
 
@@ -247,6 +256,8 @@ There are two ways to see status:
 - resolved target family
 - timeout
 - current draft intent and effective rewrite mode, when the editor is readable
+- the last enhancement outcome, enhancer model, and whether a format-retry was needed
+- the last enhancement failure detail when a model breaks the sentinel contract
 
 Outside interactive editor mode, draft-aware status degrades gracefully.
 
@@ -282,6 +293,8 @@ Promptsmith keeps a few important guarantees:
 - preview mode lets you review before replace
 - only one enhancement runs at a time
 - output must contain exactly one sentinel block
+- invalid model-output failures say whether the model missed the sentinel, emitted multiple blocks, added extra text, or returned an empty block
+- a bad first model response is retried once with a stricter format reminder before Promptsmith fails closed
 - single collapsed Pi paste markers can be recovered from the clipboard; multi-marker drafts fail closed
 - oversized drafts fail clearly instead of being truncated silently
 - intent detection is local and deterministic; it does not use a second model call

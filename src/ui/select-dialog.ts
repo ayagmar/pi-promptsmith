@@ -1,7 +1,6 @@
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext, KeybindingsManager } from "@mariozechner/pi-coding-agent";
 import {
   fuzzyFilter,
-  getEditorKeybindings,
   Input,
   SelectList,
   truncateToWidth,
@@ -10,6 +9,7 @@ import {
   type Focusable,
   type SelectItem,
 } from "@mariozechner/pi-tui";
+import { formatShortcutKey } from "../shortcut-key.js";
 
 type DialogTheme = Pick<ExtensionContext["ui"]["theme"], "fg" | "bg" | "bold">;
 
@@ -32,8 +32,8 @@ export async function openSelectDialog(
   ctx: ExtensionContext,
   options: SelectDialogOptions
 ): Promise<string | undefined> {
-  return ctx.ui.custom<string | undefined>((tui, theme, _keybindings, done) => {
-    return new CompactSelectDialog(theme, options, {
+  return ctx.ui.custom<string | undefined>((tui, theme, keybindings, done) => {
+    return new CompactSelectDialog(theme, keybindings, options, {
       onDone: done,
       requestRender: () => tui.requestRender(),
     });
@@ -60,6 +60,7 @@ class CompactSelectDialog implements Component, Focusable {
 
   constructor(
     private readonly theme: DialogTheme,
+    private readonly keybindings: KeybindingsManager,
     options: SelectDialogOptions,
     callbacks: {
       onDone: (value: string | undefined) => void;
@@ -133,8 +134,6 @@ class CompactSelectDialog implements Component, Focusable {
   }
 
   handleInput(data: string): void {
-    const kb = getEditorKeybindings();
-
     if (this.searchable && !this.searchVisible && data === "/") {
       this.searchVisible = true;
       if (this.searchInput) {
@@ -144,18 +143,18 @@ class CompactSelectDialog implements Component, Focusable {
       return;
     }
 
-    if (kb.matches(data, "selectPageUp")) {
+    if (this.keybindings.matches(data, "tui.select.pageUp")) {
       this.movePage(-1);
       return;
     }
 
-    if (kb.matches(data, "selectPageDown")) {
+    if (this.keybindings.matches(data, "tui.select.pageDown")) {
       this.movePage(1);
       return;
     }
 
     if (this.searchVisible && this.searchInput) {
-      if (kb.matches(data, "selectCancel")) {
+      if (this.keybindings.matches(data, "tui.select.cancel")) {
         if (this.searchInput.getValue()) {
           this.searchInput.setValue("");
           this.applyFilter("");
@@ -167,7 +166,7 @@ class CompactSelectDialog implements Component, Focusable {
         return;
       }
 
-      if (!isNavigationKey(data, kb)) {
+      if (!isNavigationKey(data, this.keybindings)) {
         this.searchInput.handleInput(data);
         this.applyFilter(this.searchInput.getValue());
         return;
@@ -175,28 +174,28 @@ class CompactSelectDialog implements Component, Focusable {
     }
 
     if (this.getVisibleItems().length === 0) {
-      if (kb.matches(data, "selectCancel")) {
+      if (this.keybindings.matches(data, "tui.select.cancel")) {
         this.onDone(undefined);
       }
       return;
     }
 
-    if (kb.matches(data, "selectCancel")) {
+    if (this.keybindings.matches(data, "tui.select.cancel")) {
       this.onDone(undefined);
       return;
     }
 
-    if (kb.matches(data, "selectUp")) {
+    if (this.keybindings.matches(data, "tui.select.up")) {
       this.moveSelection(-1);
       return;
     }
 
-    if (kb.matches(data, "selectDown")) {
+    if (this.keybindings.matches(data, "tui.select.down")) {
       this.moveSelection(1);
       return;
     }
 
-    if (kb.matches(data, "selectConfirm")) {
+    if (this.keybindings.matches(data, "tui.select.confirm")) {
       this.onDone(this.filteredItems[this.selectedIndex]?.value);
     }
   }
@@ -300,24 +299,61 @@ class CompactSelectDialog implements Component, Focusable {
   }
 
   private buildHelpLine(): string {
-    const parts = ["↑↓ move"];
+    const parts = [
+      formatKeybindingPair(this.keybindings, "tui.select.up", "tui.select.down", "move"),
+    ];
     if (this.getPageCount() > 1) {
-      parts.push("PgUp/PgDn pages");
+      parts.push(
+        formatKeybindingPair(this.keybindings, "tui.select.pageUp", "tui.select.pageDown", "pages")
+      );
     }
     if (this.searchable) {
       parts.push("/ search");
     }
-    parts.push("Enter select", "Esc cancel");
+    parts.push(
+      formatKeybindingHint(this.keybindings, "tui.select.confirm", "select"),
+      formatKeybindingHint(this.keybindings, "tui.select.cancel", "cancel")
+    );
     return `  ${parts.join(" · ")}`;
   }
 }
 
-function isNavigationKey(data: string, kb: ReturnType<typeof getEditorKeybindings>): boolean {
+type DialogKeybinding = Parameters<KeybindingsManager["getKeys"]>[0];
+
+function formatKeybindingPair(
+  keybindings: KeybindingsManager,
+  first: DialogKeybinding,
+  second: DialogKeybinding,
+  description: string
+): string {
+  return `${formatKeyLabelList(keybindings, first)}/${formatKeyLabelList(keybindings, second)} ${description}`;
+}
+
+function formatKeybindingHint(
+  keybindings: KeybindingsManager,
+  keybinding: DialogKeybinding,
+  description: string
+): string {
+  return `${formatKeyLabelList(keybindings, keybinding)} ${description}`;
+}
+
+function formatKeyLabelList(keybindings: KeybindingsManager, keybinding: DialogKeybinding): string {
+  return keybindings.getKeys(keybinding).map(formatKeyLabel).join("/");
+}
+
+function formatKeyLabel(key: string): string {
+  return formatShortcutKey(key)
+    .replace("PageUp", "PgUp")
+    .replace("PageDown", "PgDn")
+    .replace("Escape", "Esc");
+}
+
+function isNavigationKey(data: string, keybindings: KeybindingsManager): boolean {
   return (
-    kb.matches(data, "selectUp") ||
-    kb.matches(data, "selectDown") ||
-    kb.matches(data, "selectPageUp") ||
-    kb.matches(data, "selectPageDown") ||
-    kb.matches(data, "selectConfirm")
+    keybindings.matches(data, "tui.select.up") ||
+    keybindings.matches(data, "tui.select.down") ||
+    keybindings.matches(data, "tui.select.pageUp") ||
+    keybindings.matches(data, "tui.select.pageDown") ||
+    keybindings.matches(data, "tui.select.confirm")
   );
 }

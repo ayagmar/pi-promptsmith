@@ -1,5 +1,6 @@
 import type { SelectDialogItem } from "./select-dialog.js";
-import type { ModelRef, PromptsmithSettings } from "../types.js";
+import { formatShortcutKey } from "../shortcut-key.js";
+import type { ModelRef, PromptsmithAutoSendBusyBehavior, PromptsmithSettings } from "../types.js";
 
 export type SettingsMenuOptionId =
   | "enabled"
@@ -17,6 +18,8 @@ export type SettingsMenuOptionId =
   | "rewriteStrength"
   | "rewriteMode"
   | "previewBeforeReplace"
+  | "autoSendEnhancedPrompt"
+  | "autoSendBusyBehavior"
   | "preserveCodeBlocks"
   | "exactModelOverrides"
   | "familyOverrides"
@@ -47,6 +50,11 @@ export const REWRITE_MODE_OPTIONS = [
   "execution-contract — execution contract",
 ] as const;
 
+export const AUTO_SEND_BUSY_BEHAVIOR_OPTIONS = [
+  "steer — send after the current tool batch",
+  "follow-up — wait until Pi becomes idle",
+] as const;
+
 export const FAMILY_OPTIONS = [
   "gpt — direct, concise, sectioned",
   "claude — explicit, strongly structured, XML-friendly",
@@ -54,19 +62,19 @@ export const FAMILY_OPTIONS = [
 
 export function buildSettingsMenuOptions(
   settings: PromptsmithSettings
-): Record<SettingsMenuOptionId, SelectDialogItem> {
+): Partial<Record<SettingsMenuOptionId, SelectDialogItem>> {
   return {
     enabled: createSettingsMenuItem(
       "enabled",
       "Prompt enhancement",
       onOff(settings.enabled),
-      "Master switch for /promptsmith and Alt+P."
+      "Master switch for /promptsmith and the keyboard shortcut."
     ),
     shortcutEnabled: createSettingsMenuItem(
       "shortcutEnabled",
-      "Keyboard shortcut (Alt+P)",
-      onOff(settings.shortcutEnabled),
-      "Run Promptsmith directly from the editor."
+      "Keyboard shortcut",
+      `${onOff(settings.shortcutEnabled)} · ${formatShortcutKey(settings.shortcutKey)}`,
+      "Run Promptsmith directly from the editor. Change the key combo or turn it off."
     ),
     statusBarEnabled: createSettingsMenuItem(
       "statusBarEnabled",
@@ -146,6 +154,22 @@ export function buildSettingsMenuOptions(
       onOff(settings.previewBeforeReplace),
       "Open a review step before overwriting the current draft."
     ),
+    autoSendEnhancedPrompt: createSettingsMenuItem(
+      "autoSendEnhancedPrompt",
+      "Auto-send refined prompt",
+      onOff(settings.autoSendEnhancedPrompt),
+      "After refinement, submit the final prompt immediately instead of leaving it in the editor."
+    ),
+    ...(settings.autoSendEnhancedPrompt
+      ? {
+          autoSendBusyBehavior: createSettingsMenuItem(
+            "autoSendBusyBehavior",
+            "Auto-send while busy",
+            describeAutoSendBusyBehavior(settings.autoSendBusyBehavior),
+            "When Pi is already running, choose whether the refined prompt interrupts next or waits as a follow-up."
+          ),
+        }
+      : {}),
     preserveCodeBlocks: createSettingsMenuItem(
       "preserveCodeBlocks",
       "Keep code blocks unchanged",
@@ -229,6 +253,17 @@ export function describeSelectedRewriteMode(
   }
 }
 
+export function describeSelectedAutoSendBusyBehavior(
+  value: PromptsmithAutoSendBusyBehavior
+): string | undefined {
+  switch (value) {
+    case "steer":
+      return AUTO_SEND_BUSY_BEHAVIOR_OPTIONS[0];
+    case "followUp":
+      return AUTO_SEND_BUSY_BEHAVIOR_OPTIONS[1];
+  }
+}
+
 export function parseLabeledTargetFamilyMode(
   value: string | undefined
 ): PromptsmithSettings["targetFamilyMode"] | undefined {
@@ -262,6 +297,14 @@ export function parseLabeledRewriteMode(
   if (value?.startsWith("auto")) return "auto";
   if (value?.startsWith("plain")) return "plain";
   if (value?.startsWith("execution-contract")) return "execution-contract";
+  return undefined;
+}
+
+export function parseLabeledAutoSendBusyBehavior(
+  value: string | undefined
+): PromptsmithAutoSendBusyBehavior | undefined {
+  if (value?.startsWith("steer")) return "steer";
+  if (value?.startsWith("follow-up")) return "followUp";
   return undefined;
 }
 
@@ -325,4 +368,8 @@ function describeRewriteMode(settings: PromptsmithSettings): string {
     case "execution-contract":
       return "Execution contract";
   }
+}
+
+function describeAutoSendBusyBehavior(value: PromptsmithAutoSendBusyBehavior): string {
+  return value === "followUp" ? "Follow-up" : "Steer";
 }

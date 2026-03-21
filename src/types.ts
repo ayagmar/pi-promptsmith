@@ -7,6 +7,7 @@ export type PromptsmithEnhancerModelMode = "active" | "fixed" | "family-linked";
 export type PromptsmithRewriteStrength = "light" | "balanced" | "strong";
 export type PromptsmithRewriteMode = "auto" | "plain" | "execution-contract";
 export type PromptsmithEffectiveRewriteMode = Exclude<PromptsmithRewriteMode, "auto">;
+export type PromptsmithAutoSendBusyBehavior = "steer" | "followUp";
 export type PromptsmithTaskIntent =
   | "implement"
   | "debug"
@@ -41,6 +42,7 @@ export interface PromptsmithSettings {
   version: 1;
   enabled: boolean;
   shortcutEnabled: boolean;
+  shortcutKey: string;
   targetFamilyMode: PromptsmithTargetFamilyMode;
   fallbackFamily: PromptsmithFamily;
   exactModelOverrides: ExactModelOverride[];
@@ -54,6 +56,8 @@ export interface PromptsmithSettings {
   rewriteStrength: PromptsmithRewriteStrength;
   rewriteMode: PromptsmithRewriteMode;
   previewBeforeReplace: boolean;
+  autoSendEnhancedPrompt: boolean;
+  autoSendBusyBehavior: PromptsmithAutoSendBusyBehavior;
   preserveCodeBlocks: boolean;
   enhancementTimeoutMs: number;
 }
@@ -110,6 +114,14 @@ export interface PromptsmithDraftResolution {
   effectiveRewriteMode: PromptsmithEffectiveRewriteMode;
 }
 
+export interface PromptsmithEnhancementAttempt {
+  outcome: "success" | "cancelled" | "failed";
+  enhancerModel?: ModelRef;
+  retryUsed: boolean;
+  recoveredAfterRetry: boolean;
+  detail?: string;
+}
+
 export interface PromptsmithStatusSnapshot {
   settings: PromptsmithSettings;
   activeModel?: ModelRef;
@@ -119,6 +131,7 @@ export interface PromptsmithStatusSnapshot {
   undoAvailable: boolean;
   currentDraftResolution?: PromptsmithDraftResolution;
   lastDraftResolution?: PromptsmithDraftResolution;
+  lastEnhancementAttempt?: PromptsmithEnhancementAttempt;
 }
 
 export interface PromptsmithRuntimeSupport {

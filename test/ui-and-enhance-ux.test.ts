@@ -13,6 +13,7 @@ import {
   createAssistantResponse,
   createCommandContext,
   createCompleteResponse,
+  createMockKeybindings,
   createMockPi,
   createModel,
   createRuntimeState,
@@ -41,6 +42,37 @@ void test("compact model selector paginates and supports / search", async () => 
   const initialRender = ctx.uiState.customRenderHistory[0]?.join("\n") ?? "";
   assert.match(initialRender, /Page 1\/3/);
   assert.match(initialRender, /\/ search/);
+});
+
+void test("select dialog help line reflects the active keybindings", async () => {
+  const ctx = createCommandContext({
+    keybindingsConfig: {
+      "tui.select.up": "k",
+      "tui.select.down": "j",
+      "tui.select.pageUp": "u",
+      "tui.select.pageDown": "d",
+      "tui.select.confirm": "space",
+      "tui.select.cancel": ["q", "escape"],
+    },
+  });
+
+  await openSelectDialog(ctx, {
+    title: "Choose model",
+    items: [
+      { value: "one", label: "one" },
+      { value: "two", label: "two" },
+      { value: "three", label: "three" },
+    ],
+    pageSize: 2,
+    searchable: true,
+  });
+
+  const helpLine = ctx.uiState.customRenderHistory[0]?.at(-1) ?? "";
+  assert.match(helpLine, /K\/J move/);
+  assert.match(helpLine, /U\/D pages/);
+  assert.match(helpLine, /\/ search/);
+  assert.match(helpLine, /Space select/);
+  assert.match(helpLine, /Q\/Esc cancel/);
 });
 
 void test("selector navigation wraps from top to bottom", async () => {
@@ -142,7 +174,7 @@ void test("select dialog truncates long titles to the available width", async ()
                 bg: (_color: string, text: string) => text,
                 bold: (text: string) => text,
               },
-              undefined,
+              createMockKeybindings(),
               () => undefined
             )
           : factory;
@@ -288,7 +320,6 @@ void test("clearing the fixed enhancer model in fixed mode falls back to active 
     services: {
       refreshStatus: () => undefined,
     },
-    settings: runtime.getSettings(),
   });
 
   assert.equal(runtime.getSettings().enhancerModelMode, "active");
@@ -323,7 +354,7 @@ void test("exact override manual routing picker omits the Clear option", async (
                 bg: (_color: string, text: string) => text,
                 bold: (text: string) => text,
               },
-              undefined,
+              createMockKeybindings(),
               () => undefined
             )
           : factory;
@@ -346,7 +377,6 @@ void test("exact override manual routing picker omits the Clear option", async (
     services: {
       refreshStatus: () => undefined,
     },
-    settings: runtime.getSettings(),
   });
 
   assert.equal(
@@ -397,7 +427,7 @@ void test("exact override removal clears case-variant duplicates and uses the ra
                 bg: (_color: string, text: string) => text,
                 bold: (text: string) => text,
               },
-              undefined,
+              createMockKeybindings(),
               () => undefined
             )
           : factory;
@@ -423,7 +453,6 @@ void test("exact override removal clears case-variant duplicates and uses the ra
         refreshCount += 1;
       },
     },
-    settings: runtime.getSettings(),
   });
 
   assert.deepEqual(removeRuleOptions[0], {
@@ -438,7 +467,6 @@ void test("exact override removal clears case-variant duplicates and uses the ra
 
 void test("settings actions persist against the latest runtime snapshot", async () => {
   const runtime = createRuntimeState();
-  const staleSettings = runtime.getSettings();
   runtime.replaceSettings({ ...runtime.getSettings(), statusBarEnabled: true });
 
   const ctx = createCommandContext();
@@ -449,11 +477,27 @@ void test("settings actions persist against the latest runtime snapshot", async 
     services: {
       refreshStatus: () => undefined,
     },
-    settings: staleSettings,
   });
 
   assert.equal(runtime.getSettings().enabled, false);
   assert.equal(runtime.getSettings().statusBarEnabled, true);
+});
+
+void test("settings actions let users choose auto-send behavior while busy", async () => {
+  const runtime = createRuntimeState();
+  const ctx = createCommandContext({
+    nextSelectValue: "follow-up — wait until Pi becomes idle",
+  });
+
+  await runSettingsAction("autoSendBusyBehavior", {
+    ctx,
+    runtime,
+    services: {
+      refreshStatus: () => undefined,
+    },
+  });
+
+  assert.equal(runtime.getSettings().autoSendBusyBehavior, "followUp");
 });
 
 void test("settings actions report persistence failures without throwing", async () => {
@@ -474,7 +518,6 @@ void test("settings actions report persistence failures without throwing", async
         refreshCount += 1;
       },
     },
-    settings: runtime.getSettings(),
   });
 
   assert.deepEqual(runtime.getSettings(), previousSettings);
@@ -523,7 +566,7 @@ void test("pattern override removal uses the raw pattern value and clears case-v
                 bg: (_color: string, text: string) => text,
                 bold: (text: string) => text,
               },
-              undefined,
+              createMockKeybindings(),
               () => undefined
             )
           : factory;
@@ -546,7 +589,6 @@ void test("pattern override removal uses the raw pattern value and clears case-v
     services: {
       refreshStatus: () => undefined,
     },
-    settings: runtime.getSettings(),
   });
 
   assert.deepEqual(removeRuleOptions[1], {
@@ -576,6 +618,7 @@ void test("enhancement retries once when the first model response breaks the sen
       );
     },
     exec: harness.pi.exec.bind(harness.pi),
+    sendUserMessage: harness.pi.sendUserMessage.bind(harness.pi),
     refreshStatus: () => undefined,
     runCancellableTask: (_ctx, _message, task) => task(new AbortController().signal),
   });

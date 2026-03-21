@@ -128,6 +128,19 @@ export async function handlePromptsmithCommand(
           "Preview setting updated."
         );
         return;
+      case "auto-send":
+        handleBooleanSettingCommand(
+          command,
+          ctx,
+          runtime,
+          services,
+          "autoSendEnhancedPrompt",
+          "Auto-send setting updated."
+        );
+        return;
+      case "auto-send-when-busy":
+        handleAutoSendBusyBehaviorCommand(command, ctx, runtime, services);
+        return;
       case "preserve-code":
         handleBooleanSettingCommand(
           command,
@@ -183,6 +196,8 @@ export function getPromptsmithArgumentCompletions(
     "status-bar",
     "strength",
     "preview",
+    "auto-send",
+    "auto-send-when-busy",
     "preserve-code",
     "timeout",
     "help",
@@ -423,6 +438,26 @@ function handleStrengthCommand(
   );
 }
 
+function handleAutoSendBusyBehaviorCommand(
+  command: ParsedPromptsmithCommand,
+  ctx: ExtensionCommandContext,
+  runtime: PromptsmithRuntimeState,
+  services: CommandServices
+): void {
+  const behavior = parseAutoSendBusyBehavior(command.args[0]);
+  if (!behavior) {
+    throw new Error("Usage: /promptsmith auto-send-when-busy steer|follow-up");
+  }
+
+  persistSettings(
+    ctx,
+    runtime,
+    services,
+    { ...runtime.getSettings(), autoSendBusyBehavior: behavior },
+    `Auto-send while busy now uses ${behavior === "followUp" ? "follow-up" : "steer"}.`
+  );
+}
+
 function handleTimeoutCommand(
   command: ParsedPromptsmithCommand,
   ctx: ExtensionCommandContext,
@@ -453,6 +488,16 @@ function parseRewriteMode(value: string | undefined): PromptsmithRewriteMode | u
     : undefined;
 }
 
+function parseAutoSendBusyBehavior(
+  value: string | undefined
+): PromptsmithSettings["autoSendBusyBehavior"] | undefined {
+  return value === "steer" || value === "followUp" || value === "follow-up"
+    ? value === "follow-up"
+      ? "followUp"
+      : value
+    : undefined;
+}
+
 function formatTimeoutSeconds(timeoutMs: number): string {
   return `${Math.floor(timeoutMs / 1_000)} seconds`;
 }
@@ -474,6 +519,7 @@ type BooleanSettingKey =
   | "includeProjectMetadata"
   | "statusBarEnabled"
   | "previewBeforeReplace"
+  | "autoSendEnhancedPrompt"
   | "preserveCodeBlocks";
 
 function notify(

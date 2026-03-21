@@ -7,6 +7,7 @@ import {
   MAX_ENHANCEMENT_TIMEOUT_MS,
   MIN_ENHANCEMENT_TIMEOUT_MS,
 } from "./constants.js";
+import { validateShortcutKey } from "./shortcut-key.js";
 import { normalize } from "./model-routing.js";
 import type {
   ExactModelOverride,
@@ -14,6 +15,7 @@ import type {
   FamilyOverride,
   ModelRef,
   PromptsmithDraftResolution,
+  PromptsmithEnhancementAttempt,
   PromptsmithSettings,
 } from "./types.js";
 import { UndoManager } from "./undo.js";
@@ -22,6 +24,7 @@ export class PromptsmithRuntimeState {
   private settings: PromptsmithSettings = cloneSettings(DEFAULT_SETTINGS);
   private busy = false;
   private lastDraftResolution: PromptsmithDraftResolution | undefined;
+  private lastEnhancementAttempt: PromptsmithEnhancementAttempt | undefined;
   readonly undo = new UndoManager();
 
   constructor(private readonly settingsPath = getGlobalSettingsPath()) {}
@@ -45,6 +48,7 @@ export class PromptsmithRuntimeState {
     const restoredSettings = restoreSettingsFromDisk(this.settingsPath);
     this.replaceSettings(restoredSettings ?? cloneSettings(DEFAULT_SETTINGS));
     this.busy = false;
+    this.lastEnhancementAttempt = undefined;
     this.undo.clear();
   }
 
@@ -54,6 +58,24 @@ export class PromptsmithRuntimeState {
 
   rememberDraftResolution(resolution: PromptsmithDraftResolution): void {
     this.lastDraftResolution = { ...resolution };
+  }
+
+  getLastEnhancementAttempt(): PromptsmithEnhancementAttempt | undefined {
+    return this.lastEnhancementAttempt
+      ? {
+          ...this.lastEnhancementAttempt,
+          ...(this.lastEnhancementAttempt.enhancerModel
+            ? { enhancerModel: { ...this.lastEnhancementAttempt.enhancerModel } }
+            : {}),
+        }
+      : undefined;
+  }
+
+  rememberEnhancementAttempt(attempt: PromptsmithEnhancementAttempt): void {
+    this.lastEnhancementAttempt = {
+      ...attempt,
+      ...(attempt.enhancerModel ? { enhancerModel: { ...attempt.enhancerModel } } : {}),
+    };
   }
 
   isBusy(): boolean {
@@ -95,6 +117,7 @@ export function sanitizeSettings(value: unknown): PromptsmithSettings | undefine
     version: DEFAULT_SETTINGS.version,
     enabled: readBoolean(value.enabled, DEFAULT_SETTINGS.enabled),
     shortcutEnabled: readBoolean(value.shortcutEnabled, DEFAULT_SETTINGS.shortcutEnabled),
+    shortcutKey: readShortcutKey(value.shortcutKey),
     targetFamilyMode: readTargetFamilyMode(value.targetFamilyMode),
     fallbackFamily: readFamily(value.fallbackFamily, DEFAULT_SETTINGS.fallbackFamily),
     exactModelOverrides: sanitizeExactOverrides(value.exactModelOverrides),
@@ -117,6 +140,11 @@ export function sanitizeSettings(value: unknown): PromptsmithSettings | undefine
       value.previewBeforeReplace,
       DEFAULT_SETTINGS.previewBeforeReplace
     ),
+    autoSendEnhancedPrompt: readBoolean(
+      value.autoSendEnhancedPrompt,
+      DEFAULT_SETTINGS.autoSendEnhancedPrompt
+    ),
+    autoSendBusyBehavior: readAutoSendBusyBehavior(value.autoSendBusyBehavior),
     preserveCodeBlocks: readBoolean(value.preserveCodeBlocks, DEFAULT_SETTINGS.preserveCodeBlocks),
     enhancementTimeoutMs: readEnhancementTimeoutMs(value.enhancementTimeoutMs),
   };
@@ -185,10 +213,7 @@ function dedupeExactOverrides(overrides: ExactModelOverride[]): ExactModelOverri
   const deduped: ExactModelOverride[] = [];
 
   for (let index = overrides.length - 1; index >= 0; index -= 1) {
-    const entry = overrides[index];
-    if (!entry) {
-      continue;
-    }
+    const entry = overrides[index]!;
     const key = `${normalize(entry.provider)}/${normalize(entry.id)}`;
     if (seen.has(key)) {
       continue;
@@ -205,10 +230,7 @@ function dedupeFamilyOverrides(overrides: FamilyOverride[]): FamilyOverride[] {
   const deduped: FamilyOverride[] = [];
 
   for (let index = overrides.length - 1; index >= 0; index -= 1) {
-    const entry = overrides[index];
-    if (!entry) {
-      continue;
-    }
+    const entry = overrides[index]!;
     const key = normalize(entry.pattern);
     if (seen.has(key)) {
       continue;
@@ -242,6 +264,14 @@ function readFamily<TFallback extends string | undefined>(
   return value === "gpt" || value === "claude" ? value : fallback;
 }
 
+function readShortcutKey(value: unknown): string {
+  if (typeof value !== "string") {
+    return DEFAULT_SETTINGS.shortcutKey;
+  }
+
+  return validateShortcutKey(value).normalized ?? DEFAULT_SETTINGS.shortcutKey;
+}
+
 function readTargetFamilyMode(value: unknown): PromptsmithSettings["targetFamilyMode"] {
   return value === "auto" || value === "gpt" || value === "claude"
     ? value
@@ -264,6 +294,10 @@ function readRewriteMode(value: unknown): PromptsmithSettings["rewriteMode"] {
   return value === "auto" || value === "plain" || value === "execution-contract"
     ? value
     : DEFAULT_SETTINGS.rewriteMode;
+}
+
+function readAutoSendBusyBehavior(value: unknown): PromptsmithSettings["autoSendBusyBehavior"] {
+  return value === "steer" || value === "followUp" ? value : DEFAULT_SETTINGS.autoSendBusyBehavior;
 }
 
 function readEnhancementTimeoutMs(value: unknown): number {
