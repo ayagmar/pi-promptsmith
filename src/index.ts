@@ -4,11 +4,7 @@ import type { CompleteFn } from "./enhance.js";
 import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "./constants.js";
 import { getPromptsmithArgumentCompletions, handlePromptsmithCommand } from "./commands.js";
 import { runEnhancementWithLoader } from "./enhance.js";
-import {
-  findShortcutConflictAction,
-  formatShortcutKey,
-  normalizeShortcutKey,
-} from "./shortcut-key.js";
+import { formatShortcutKey, getCustomShortcutKey } from "./shortcut-key.js";
 import { PromptsmithRuntimeState } from "./state.js";
 import { handlePromptsmithShortcut } from "./shortcut.js";
 import { PromptsmithEditor } from "./ui/promptsmith-editor.js";
@@ -44,12 +40,8 @@ export function createPromptsmithExtension(
       return;
     }
 
-    const settings = runtime.getSettings();
-    const shortcutKey = normalizeShortcutKey(settings.shortcutKey) ?? DEFAULT_SHORTCUT_KEY;
-    const shouldUseCustomEditor =
-      settings.enabled && settings.shortcutEnabled && shortcutKey !== DEFAULT_SHORTCUT_KEY;
-
-    if (!shouldUseCustomEditor) {
+    const shortcutKey = getCustomShortcutKey(runtime.getSettings());
+    if (!shortcutKey) {
       clearEditorComponent(ctx);
       return;
     }
@@ -62,14 +54,10 @@ export function createPromptsmithExtension(
     activeCustomShortcutKey = undefined;
     ownsEditorComponent = true;
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
-      const currentShortcutKey =
-        normalizeShortcutKey(runtime.getSettings().shortcutKey) ?? DEFAULT_SHORTCUT_KEY;
-      activeCustomShortcutKey = findShortcutConflictAction(
-        currentShortcutKey,
+      activeCustomShortcutKey = getCustomShortcutKey(
+        runtime.getSettings(),
         keybindings.getEffectiveConfig()
-      )
-        ? undefined
-        : currentShortcutKey;
+      );
 
       return new PromptsmithEditor(
         tui,
@@ -80,6 +68,7 @@ export function createPromptsmithExtension(
           void handlePromptsmithShortcut(ctx, runtime, {
             completeFn: options?.completeFn ?? complete,
             exec: pi.exec.bind(pi),
+            sendUserMessage: pi.sendUserMessage.bind(pi),
             refreshStatus,
             runCancellableTask: runEnhancementWithLoader,
             openSettings,
@@ -116,6 +105,7 @@ export function createPromptsmithExtension(
     await handlePromptsmithShortcut(ctx, runtime, {
       completeFn: options?.completeFn ?? complete,
       exec: pi.exec.bind(pi),
+      sendUserMessage: pi.sendUserMessage.bind(pi),
       refreshStatus,
       runCancellableTask: runEnhancementWithLoader,
       openSettings,
@@ -153,6 +143,7 @@ export function createPromptsmithExtension(
       await handlePromptsmithCommand(args, ctx, runtime, {
         completeFn: options?.completeFn ?? complete,
         exec: pi.exec.bind(pi),
+        sendUserMessage: pi.sendUserMessage.bind(pi),
         refreshStatus,
         runCancellableTask: runEnhancementWithLoader,
       });

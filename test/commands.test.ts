@@ -132,6 +132,7 @@ void test("shortcut expands Pi paste markers from the clipboard before enhanceme
       return Promise.resolve(createCompleteResponse("Enhanced prompt"));
     },
     exec: () => Promise.resolve({ stdout: clipboardText, stderr: "", code: 0, killed: false }),
+    sendUserMessage: () => undefined,
     refreshStatus: () => undefined,
     runCancellableTask: (_ctx, _message, task) => task(new AbortController().signal),
     openSettings: () => Promise.resolve(),
@@ -152,10 +153,24 @@ void test("settings ui shows clearer labels and the footer status toggle", async
   assert.ok(firstMenu.some((option) => /Prompt enhancement · On/i.test(option)));
   assert.ok(firstMenu.some((option) => /Keyboard shortcut · On · Alt\+P/i.test(option)));
   assert.ok(firstMenu.some((option) => /Footer status bar · Off/i.test(option)));
+  assert.ok(firstMenu.some((option) => /Auto-send refined prompt · Off/i.test(option)));
+  assert.ok(!firstMenu.some((option) => /Auto-send while busy · Steer/i.test(option)));
   assert.ok(firstMenu.some((option) => /Rewrite mode · Auto/i.test(option)));
 
   const initialRender = ctx.uiState.customRenderHistory[0]?.join("\n") ?? "";
   assert.match(initialRender, /Master switch for \/promptsmith and the keyboard shortcut/i);
+});
+
+void test("settings ui shows the busy auto-send row only when auto-send is on", async () => {
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({ ...runtime.getSettings(), autoSendEnhancedPrompt: true });
+  const ctx = createCommandContext({ model: createModel(), nextSelectValue: "done" });
+
+  await openSettingsUi(ctx, runtime, { refreshStatus: () => undefined });
+
+  const firstMenu = ctx.uiState.customOptionsHistory[0] ?? [];
+  assert.ok(firstMenu.some((option) => /Auto-send refined prompt · On/i.test(option)));
+  assert.ok(firstMenu.some((option) => /Auto-send while busy · Steer/i.test(option)));
 });
 
 void test("default enhancement skips recent conversation context for speed", async () => {
@@ -228,6 +243,112 @@ void test("preview cancellation records a cancelled enhancement attempt", async 
 
   assert.equal(ctx.uiState.editorText, "draft");
   assert.equal(runtime.getLastEnhancementAttempt()?.outcome, "cancelled");
+});
+
+void test("auto-send submits the enhanced prompt and clears the editor", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({
+    model: createModel(),
+    editorText: "draft",
+  });
+
+  runtime.replaceSettings({ ...runtime.getSettings(), autoSendEnhancedPrompt: true });
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("Enhanced prompt")))
+  );
+
+  assert.equal(ctx.uiState.editorText, "");
+  assert.deepEqual(harness.userMessages, [{ content: "Enhanced prompt", options: undefined }]);
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /enhanced and sent/i);
+});
+
+void test("auto-send uses the reviewed prompt when preview mode is on", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({
+    model: createModel(),
+    editorText: "draft",
+    editorResponse: "Reviewed prompt",
+  });
+
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    previewBeforeReplace: true,
+    autoSendEnhancedPrompt: true,
+  });
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("Enhanced prompt")))
+  );
+
+  assert.equal(ctx.uiState.editorText, "");
+  assert.deepEqual(harness.userMessages, [{ content: "Reviewed prompt", options: undefined }]);
+});
+
+void test("auto-send uses follow-up delivery when configured and Pi is busy", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({
+    model: createModel(),
+    editorText: "draft",
+  });
+  Object.assign(ctx, { isIdle: () => false });
+
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    autoSendEnhancedPrompt: true,
+    autoSendBusyBehavior: "followUp",
+  });
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("Enhanced prompt")))
+  );
+
+  assert.equal(ctx.uiState.editorText, "");
+  assert.deepEqual(harness.userMessages, [
+    { content: "Enhanced prompt", options: { deliverAs: "followUp" } },
+  ]);
+});
+
+void test("auto-send leaves an empty reviewed prompt in the editor", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({
+    model: createModel(),
+    editorText: "draft",
+    editorResponse: "   ",
+  });
+
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    previewBeforeReplace: true,
+    autoSendEnhancedPrompt: true,
+  });
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("Enhanced prompt")))
+  );
+
+  assert.equal(ctx.uiState.editorText, "   ");
+  assert.deepEqual(harness.userMessages, []);
+  assert.match(
+    ctx.uiState.notifications.map((entry) => entry.message).join("\n"),
+    /final prompt is empty/i
+  );
 });
 
 void test("cancelled enhancement leaves the editor unchanged", async () => {
@@ -462,6 +583,41 @@ void test("status-bar command updates the saved footer status setting", async ()
   assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /status bar setting updated/i);
 });
 
+void test("auto-send command updates the saved send-after-refine setting", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel() });
+
+  await handlePromptsmithCommand(
+    "auto-send on",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("unused")))
+  );
+
+  assert.equal(runtime.getSettings().autoSendEnhancedPrompt, true);
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /auto-send setting updated/i);
+});
+
+void test("auto-send-when-busy command updates the busy delivery behavior", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel() });
+
+  await handlePromptsmithCommand(
+    "auto-send-when-busy follow-up",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("unused")))
+  );
+
+  assert.equal(runtime.getSettings().autoSendBusyBehavior, "followUp");
+  assert.match(
+    ctx.uiState.notifications.at(-1)?.message ?? "",
+    /auto-send while busy now uses follow-up/i
+  );
+});
+
 void test("timeout command updates the saved project setting", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
@@ -643,6 +799,7 @@ function createServices(
   return {
     completeFn,
     exec: harness.pi.exec.bind(harness.pi),
+    sendUserMessage: harness.pi.sendUserMessage.bind(harness.pi),
     refreshStatus: () => undefined,
     runCancellableTask: (_ctx, _message, task) => task(new AbortController().signal),
     ...overrides,
@@ -657,6 +814,7 @@ function createShortcutServices(
   return {
     completeFn,
     exec: harness.pi.exec.bind(harness.pi),
+    sendUserMessage: harness.pi.sendUserMessage.bind(harness.pi),
     refreshStatus: () => undefined,
     runCancellableTask: (_ctx, _message, task) => task(new AbortController().signal),
     openSettings: () => ctx.ui.select("Promptsmith settings", ["Done"]).then(() => undefined),

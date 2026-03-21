@@ -7,6 +7,7 @@ export type PromptsmithEnhancerModelMode = "active" | "fixed" | "family-linked";
 export type PromptsmithRewriteStrength = "light" | "balanced" | "strong";
 export type PromptsmithRewriteMode = "auto" | "plain" | "execution-contract";
 export type PromptsmithEffectiveRewriteMode = Exclude<PromptsmithRewriteMode, "auto">;
+export type PromptsmithAutoSendBusyBehavior = "steer" | "followUp";
 export type PromptsmithTaskIntent =
   | "implement"
   | "debug"
@@ -55,6 +56,8 @@ export interface PromptsmithSettings {
   rewriteStrength: PromptsmithRewriteStrength;
   rewriteMode: PromptsmithRewriteMode;
   previewBeforeReplace: boolean;
+  autoSendEnhancedPrompt: boolean;
+  autoSendBusyBehavior: PromptsmithAutoSendBusyBehavior;
   preserveCodeBlocks: boolean;
   enhancementTimeoutMs: number;
 }

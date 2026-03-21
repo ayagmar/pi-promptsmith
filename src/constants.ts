@@ -37,6 +37,8 @@ export const DEFAULT_SETTINGS: PromptsmithSettings = {
   rewriteStrength: "balanced",
   rewriteMode: "auto",
   previewBeforeReplace: false,
+  autoSendEnhancedPrompt: false,
+  autoSendBusyBehavior: "steer",
   preserveCodeBlocks: true,
   enhancementTimeoutMs: DEFAULT_ENHANCEMENT_TIMEOUT_MS,
 };
@@ -62,6 +64,8 @@ export const HELP_LINES = [
   `/${EXTENSION_COMMAND} status-bar on|off`,
   `/${EXTENSION_COMMAND} strength light|balanced|strong`,
   `/${EXTENSION_COMMAND} preview on|off`,
+  `/${EXTENSION_COMMAND} auto-send on|off`,
+  `/${EXTENSION_COMMAND} auto-send-when-busy steer|follow-up`,
   `/${EXTENSION_COMMAND} preserve-code on|off`,
   `/${EXTENSION_COMMAND} timeout <seconds>`,
 ].join("\n");

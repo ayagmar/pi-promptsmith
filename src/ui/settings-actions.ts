@@ -25,6 +25,8 @@ import { parseEnhancementTimeoutSeconds } from "../validation.js";
 import { openSelectDialog, type SelectDialogItem } from "./select-dialog.js";
 import { captureShortcutKey } from "./shortcut-capture.js";
 import {
+  AUTO_SEND_BUSY_BEHAVIOR_OPTIONS,
+  describeSelectedAutoSendBusyBehavior,
   describeSelectedEnhancerMode,
   describeSelectedRewriteMode,
   describeSelectedStrength,
@@ -32,6 +34,7 @@ import {
   ENHANCER_MODEL_OPTIONS,
   FAMILY_OPTIONS,
   formatTimeoutSeconds,
+  parseLabeledAutoSendBusyBehavior,
   parseLabeledEnhancerMode,
   parseLabeledRewriteMode,
   parseLabeledStrength,
@@ -358,6 +361,34 @@ export async function runSettingsAction(
         (next) => `Review before replace is now ${next.previewBeforeReplace ? "on" : "off"}.`
       );
       return;
+    case "autoSendEnhancedPrompt":
+      persistSettings(
+        ctx,
+        runtime,
+        services,
+        (latest) => ({ ...latest, autoSendEnhancedPrompt: !latest.autoSendEnhancedPrompt }),
+        (next) => `Auto-send refined prompt is now ${next.autoSendEnhancedPrompt ? "on" : "off"}.`
+      );
+      return;
+    case "autoSendBusyBehavior": {
+      const behavior = await selectOption(
+        ctx,
+        "Choose auto-send behavior while Pi is busy",
+        AUTO_SEND_BUSY_BEHAVIOR_OPTIONS,
+        describeSelectedAutoSendBusyBehavior(settings.autoSendBusyBehavior)
+      );
+      const nextBehavior = parseLabeledAutoSendBusyBehavior(behavior);
+      if (nextBehavior) {
+        persistSettings(
+          ctx,
+          runtime,
+          services,
+          (latest) => ({ ...latest, autoSendBusyBehavior: nextBehavior }),
+          `Auto-send while busy now uses ${nextBehavior === "followUp" ? "follow-up" : "steer"}.`
+        );
+      }
+      return;
+    }
     case "preserveCodeBlocks":
       persistSettings(
         ctx,

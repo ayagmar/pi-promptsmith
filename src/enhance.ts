@@ -43,6 +43,7 @@ export type CompleteFn = (
 export interface EnhancementServices {
   completeFn: CompleteFn;
   exec: ExtensionAPI["exec"];
+  sendUserMessage: ExtensionAPI["sendUserMessage"];
   refreshStatus: (ctx: ExtensionContext) => void;
   enhancementTimeoutMs?: number;
   runCancellableTask: (
@@ -127,8 +128,16 @@ export async function enhanceEditorDraft(
 
     attempt = buildEnhancementAttempt(prepared, tracker, "success");
     runtime.undo.store(draft);
-    ctx.ui.setEditorText(finalText);
-    ctx.ui.notify(buildSuccessMessage(tracker), "info");
+
+    const autoSendResult = sendEnhancedPromptIfConfigured(ctx, settings, finalText, services);
+    if (!autoSendResult.sent) {
+      ctx.ui.setEditorText(finalText);
+    }
+
+    ctx.ui.notify(buildSuccessMessage(tracker, autoSendResult.sent), "info");
+    if (autoSendResult.error) {
+      ctx.ui.notify(autoSendResult.error, "warning");
+    }
   } catch (error) {
     const detail =
       tracker.failureDetail ?? (error instanceof Error ? error.message : String(error));
@@ -403,10 +412,46 @@ function buildEnhancementAttempt(
   };
 }
 
-function buildSuccessMessage(tracker: EnhancementAttemptTracker): string {
+function buildSuccessMessage(tracker: EnhancementAttemptTracker, autoSent: boolean): string {
+  const action = autoSent ? "enhanced and sent the refined prompt" : "enhanced the current draft";
+
   return tracker.recoveredAfterRetry
-    ? "Promptsmith enhanced the current draft after retrying the model output format once."
-    : "Promptsmith enhanced the current draft.";
+    ? `Promptsmith ${action} after retrying the model output format once.`
+    : `Promptsmith ${action}.`;
+}
+
+function sendEnhancedPromptIfConfigured(
+  ctx: ExtensionContext,
+  settings: PromptsmithSettings,
+  finalText: string,
+  services: Pick<EnhancementServices, "sendUserMessage">
+): { sent: boolean; error?: string } {
+  if (!settings.autoSendEnhancedPrompt) {
+    return { sent: false };
+  }
+
+  if (!finalText.trim()) {
+    return {
+      sent: false,
+      error: "Promptsmith left the refined prompt in the editor because the final prompt is empty.",
+    };
+  }
+
+  try {
+    if (ctx.isIdle()) {
+      services.sendUserMessage(finalText);
+    } else {
+      services.sendUserMessage(finalText, { deliverAs: settings.autoSendBusyBehavior });
+    }
+
+    ctx.ui.setEditorText("");
+    return { sent: true };
+  } catch (error) {
+    return {
+      sent: false,
+      error: `Promptsmith refined the draft, but auto-send failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
 
 function buildInvalidModelOutputFailureSummary(

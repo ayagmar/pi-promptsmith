@@ -140,6 +140,11 @@ export function sanitizeSettings(value: unknown): PromptsmithSettings | undefine
       value.previewBeforeReplace,
       DEFAULT_SETTINGS.previewBeforeReplace
     ),
+    autoSendEnhancedPrompt: readBoolean(
+      value.autoSendEnhancedPrompt,
+      DEFAULT_SETTINGS.autoSendEnhancedPrompt
+    ),
+    autoSendBusyBehavior: readAutoSendBusyBehavior(value.autoSendBusyBehavior),
     preserveCodeBlocks: readBoolean(value.preserveCodeBlocks, DEFAULT_SETTINGS.preserveCodeBlocks),
     enhancementTimeoutMs: readEnhancementTimeoutMs(value.enhancementTimeoutMs),
   };
@@ -289,6 +294,10 @@ function readRewriteMode(value: unknown): PromptsmithSettings["rewriteMode"] {
   return value === "auto" || value === "plain" || value === "execution-contract"
     ? value
     : DEFAULT_SETTINGS.rewriteMode;
+}
+
+function readAutoSendBusyBehavior(value: unknown): PromptsmithSettings["autoSendBusyBehavior"] {
+  return value === "steer" || value === "followUp" ? value : DEFAULT_SETTINGS.autoSendBusyBehavior;
 }
 
 function readEnhancementTimeoutMs(value: unknown): number {

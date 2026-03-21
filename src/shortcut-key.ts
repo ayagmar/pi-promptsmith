@@ -109,7 +109,7 @@ interface ShortcutParts {
   key: string;
 }
 
-type EffectiveKeybindings = Record<string, string | string[]>;
+type EffectiveKeybindings = Record<string, string | string[] | undefined>;
 
 export function normalizeShortcutKey(value: string | undefined): string | undefined {
   const parts = parseShortcutParts(value);
@@ -145,10 +145,7 @@ export function validateShortcutKey(
     };
   }
 
-  const parts = normalized.split("+");
-  const hasCtrl = parts.includes("ctrl");
-  const hasAlt = parts.includes("alt");
-  if (!hasCtrl && !hasAlt) {
+  if (!hasShortcutModifier(normalized.split("+"))) {
     return {
       error: "Promptsmith shortcuts must include Alt and/or Ctrl so normal typing keeps working.",
     };
@@ -159,7 +156,7 @@ export function validateShortcutKey(
     : undefined;
   if (conflictAction) {
     return {
-      error: `That key is already used by Pi for ${conflictAction}. Pick a different shortcut.`,
+      error: `That key is already used by Pi for ${formatShortcutConflictAction(conflictAction)}. Pick a different shortcut.`,
     };
   }
 
@@ -201,25 +198,37 @@ export function isDefaultShortcutConfigured(settings: PromptsmithSettings): bool
   return normalizeShortcutKey(settings.shortcutKey) === DEFAULT_SHORTCUT_KEY;
 }
 
+export function getCustomShortcutKey(
+  settings: PromptsmithSettings,
+  effectiveKeybindings?: EffectiveKeybindings
+): KeyId | undefined {
+  if (!settings.enabled || !settings.shortcutEnabled) {
+    return undefined;
+  }
+
+  const shortcutKey = normalizeShortcutKey(settings.shortcutKey);
+  if (!shortcutKey || shortcutKey === DEFAULT_SHORTCUT_KEY) {
+    return undefined;
+  }
+
+  if (!isValidKeyId(shortcutKey)) {
+    return undefined;
+  }
+
+  if (effectiveKeybindings && findShortcutConflictAction(shortcutKey, effectiveKeybindings)) {
+    return undefined;
+  }
+
+  return shortcutKey;
+}
+
 export function matchesCustomShortcut(
   data: string,
   settings: PromptsmithSettings,
   effectiveKeybindings: EffectiveKeybindings
 ): boolean {
-  if (!settings.enabled || !settings.shortcutEnabled) {
-    return false;
-  }
-
-  const shortcutKey = normalizeShortcutKey(settings.shortcutKey);
-  if (!shortcutKey || shortcutKey === DEFAULT_SHORTCUT_KEY) {
-    return false;
-  }
-
-  if (!isValidKeyId(shortcutKey)) {
-    return false;
-  }
-
-  if (findShortcutConflictAction(shortcutKey, effectiveKeybindings)) {
+  const shortcutKey = getCustomShortcutKey(settings, effectiveKeybindings);
+  if (!shortcutKey) {
     return false;
   }
 
@@ -243,9 +252,7 @@ function isValidKeyId(value: string): value is KeyId {
     }
   }
 
-  const hasCtrl = modifierSet.has("ctrl");
-  const hasAlt = modifierSet.has("alt");
-  if (!hasCtrl && !hasAlt) {
+  if (!hasShortcutModifier(modifierSet)) {
     return false;
   }
 
@@ -317,6 +324,29 @@ function normalizeBaseKey(value: string | undefined): string | undefined {
   }
 
   return SYMBOL_KEYS.has(value) ? value : undefined;
+}
+
+function hasShortcutModifier(tokens: Iterable<string>): boolean {
+  for (const token of tokens) {
+    if (token === "ctrl" || token === "alt") {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function formatShortcutConflictAction(action: string): string {
+  const normalized = action
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .split(/[._\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.toLowerCase());
+
+  const visibleParts =
+    normalized[0] === "app" || normalized[0] === "tui" ? normalized.slice(1) : normalized;
+
+  return visibleParts.join(" ") || action;
 }
 
 function formatShortcutParts(parts: ShortcutParts): string {

@@ -205,6 +205,8 @@ void test("status report includes rewrite mode, timeout, and draft intent when i
     ...runtime.getSettings(),
     rewriteMode: "auto",
     statusBarEnabled: true,
+    autoSendEnhancedPrompt: true,
+    autoSendBusyBehavior: "followUp",
     enhancementTimeoutMs: 12_000,
   });
   const ctx = createCommandContext({
@@ -218,6 +220,8 @@ void test("status report includes rewrite mode, timeout, and draft intent when i
   assert.match(report, /effective rewrite mode: execution-contract/);
   assert.match(report, /task intent: implement/);
   assert.match(report, /status bar enabled: true/);
+  assert.match(report, /auto-send enhanced prompt: true/);
+  assert.match(report, /auto-send when busy: follow-up/);
   assert.match(report, /enhancement timeout: 12s/);
 });
 

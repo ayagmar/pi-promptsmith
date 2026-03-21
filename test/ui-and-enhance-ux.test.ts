@@ -451,6 +451,23 @@ void test("settings actions persist against the latest runtime snapshot", async 
   assert.equal(runtime.getSettings().statusBarEnabled, true);
 });
 
+void test("settings actions let users choose auto-send behavior while busy", async () => {
+  const runtime = createRuntimeState();
+  const ctx = createCommandContext({
+    nextSelectValue: "follow-up — wait until Pi becomes idle",
+  });
+
+  await runSettingsAction("autoSendBusyBehavior", {
+    ctx,
+    runtime,
+    services: {
+      refreshStatus: () => undefined,
+    },
+  });
+
+  assert.equal(runtime.getSettings().autoSendBusyBehavior, "followUp");
+});
+
 void test("settings actions report persistence failures without throwing", async () => {
   const tempDir = mkdtempSync(join(tmpdir(), "promptsmith-ui-state-"));
   const filePath = join(tempDir, "not-a-directory");
@@ -569,6 +586,7 @@ void test("enhancement retries once when the first model response breaks the sen
       );
     },
     exec: harness.pi.exec.bind(harness.pi),
+    sendUserMessage: harness.pi.sendUserMessage.bind(harness.pi),
     refreshStatus: () => undefined,
     runCancellableTask: (_ctx, _message, task) => task(new AbortController().signal),
   });

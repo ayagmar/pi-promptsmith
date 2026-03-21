@@ -205,6 +205,8 @@ void test("settings persist across sessions globally", () => {
     statusBarEnabled: true,
     shortcutKey: "ctrl+alt+p",
     rewriteMode: "plain",
+    autoSendEnhancedPrompt: true,
+    autoSendBusyBehavior: "followUp",
     enhancementTimeoutMs: 12_000,
   });
 
@@ -215,6 +217,8 @@ void test("settings persist across sessions globally", () => {
   assert.equal(restoredRuntime.getSettings().statusBarEnabled, true);
   assert.equal(restoredRuntime.getSettings().shortcutKey, "ctrl+alt+p");
   assert.equal(restoredRuntime.getSettings().rewriteMode, "plain");
+  assert.equal(restoredRuntime.getSettings().autoSendEnhancedPrompt, true);
+  assert.equal(restoredRuntime.getSettings().autoSendBusyBehavior, "followUp");
   assert.equal(restoredRuntime.getSettings().enhancementTimeoutMs, 12_000);
 });
 

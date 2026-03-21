@@ -93,6 +93,8 @@ export function buildStatusReport(ctx: ExtensionContext, runtime: PromptsmithRun
     `rewrite strength: ${settings.rewriteStrength}`,
     `enhancement timeout: ${Math.floor(settings.enhancementTimeoutMs / 1_000)}s`,
     `preview before replace: ${settings.previewBeforeReplace}`,
+    `auto-send enhanced prompt: ${settings.autoSendEnhancedPrompt}`,
+    `auto-send when busy: ${settings.autoSendBusyBehavior === "followUp" ? "follow-up" : "steer"}`,
     `preserve code blocks: ${settings.preserveCodeBlocks}`,
     `exact model overrides: ${settings.exactModelOverrides.length}`,
     `pattern overrides: ${settings.familyOverrides.length}`,

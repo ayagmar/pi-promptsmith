@@ -177,6 +177,8 @@ Inside the interactive settings and model pickers:
 - press `/` to open search in the compact selector
 - `PageUp` / `PageDown` switch pages in paginated selectors
 - the keyboard shortcut row lets you turn the shortcut on or off, remap it, or reset it to `Alt+P`
+- you can toggle auto-send if you want Promptsmith to submit the refined prompt immediately after rewriting
+- if auto-send is on, you can choose whether a busy Pi session gets the refined prompt as a steer message or a follow-up
 - when remapping, press the new key combo directly; `Esc` cancels and `Backspace` resets to default
 
 Quick config:
@@ -197,6 +199,8 @@ Quick config:
 - `/promptsmith status-bar on|off`
 - `/promptsmith strength light|balanced|strong`
 - `/promptsmith preview on|off`
+- `/promptsmith auto-send on|off`
+- `/promptsmith auto-send-when-busy steer|follow-up`
 - `/promptsmith preserve-code on|off`
 - `/promptsmith timeout <seconds>`
 
@@ -217,6 +221,8 @@ Important defaults:
 - recent conversation = `off`
 - project metadata = `off`
 - preview before replace = `false`
+- auto-send refined prompt = `false`
+- auto-send while busy = `steer`
 - preserve code blocks = `true`
 - enhancement timeout = `45s`
 

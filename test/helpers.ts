@@ -8,6 +8,7 @@ import type {
   ExtensionContext,
   SessionEntry,
 } from "@mariozechner/pi-coding-agent";
+import { matchesKey } from "@mariozechner/pi-tui";
 import { SENTINEL_CLOSE, SENTINEL_OPEN } from "../src/constants.js";
 import { PromptsmithRuntimeState } from "../src/state.js";
 
@@ -16,6 +17,10 @@ export interface MockPiHarness {
   commands: Map<string, { handler: (args: string, ctx: ExtensionCommandContext) => Promise<void> }>;
   shortcuts: Map<string, { handler: (ctx: ExtensionContext) => Promise<void> | void }>;
   events: Map<string, ((event: unknown, ctx: ExtensionContext) => unknown)[]>;
+  userMessages: {
+    content: string;
+    options: { deliverAs?: "steer" | "followUp" } | undefined;
+  }[];
 }
 
 export interface MockUiState {
@@ -35,6 +40,30 @@ export interface MockUiState {
   themeCount: number;
 }
 
+const DEFAULT_KEYBINDINGS: Record<string, string | string[]> = {
+  "tui.select.up": "up",
+  "tui.select.down": "down",
+  "tui.select.pageUp": "pageUp",
+  "tui.select.pageDown": "pageDown",
+  "tui.select.confirm": "enter",
+  "tui.select.cancel": ["escape", "ctrl+c"],
+};
+
+function createMockKeybindings() {
+  return {
+    matches: (data: string, keybinding: string) => {
+      const keys = DEFAULT_KEYBINDINGS[keybinding];
+      if (!keys) {
+        return false;
+      }
+
+      const keyList = Array.isArray(keys) ? keys : [keys];
+      return keyList.some((key) => matchesKey(data, key as Parameters<typeof matchesKey>[1]));
+    },
+    getEffectiveConfig: () => DEFAULT_KEYBINDINGS,
+  };
+}
+
 export function createMockPi(): MockPiHarness {
   const commands = new Map<
     string,
@@ -42,6 +71,10 @@ export function createMockPi(): MockPiHarness {
   >();
   const shortcuts = new Map<string, { handler: (ctx: ExtensionContext) => Promise<void> | void }>();
   const events = new Map<string, ((event: unknown, ctx: ExtensionContext) => unknown)[]>();
+  const userMessages: {
+    content: string;
+    options: { deliverAs?: "steer" | "followUp" } | undefined;
+  }[] = [];
 
   const pi = {
     on: (eventName: string, handler: (event: unknown, ctx: ExtensionContext) => unknown) => {
@@ -61,10 +94,18 @@ export function createMockPi(): MockPiHarness {
     ) => {
       shortcuts.set(name, shortcut);
     },
+    sendUserMessage: (
+      content: string,
+      options?: {
+        deliverAs?: "steer" | "followUp";
+      }
+    ) => {
+      userMessages.push({ content, options });
+    },
     exec: () => Promise.resolve({ stdout: "", stderr: "", code: 0, killed: false }),
   } as unknown as ExtensionAPI;
 
-  return { pi, commands, shortcuts, events };
+  return { pi, commands, shortcuts, events, userMessages };
 }
 
 export function createRuntimeState(): PromptsmithRuntimeState {
@@ -208,10 +249,13 @@ export function createCommandContext(options?: {
                     bg: (color: string, text: string) => string;
                     bold: (text: string) => string;
                   },
-                  keybindings: { getEffectiveConfig: () => Record<string, string | string[]> },
+                  keybindings: {
+                    matches: (data: string, keybinding: string) => boolean;
+                    getEffectiveConfig: () => Record<string, string | string[]>;
+                  },
                   done: (value: unknown) => void
                 ) => { render?: (width: number) => string[]; handleInput?: (data: string) => void }
-              )({ requestRender: captureRender }, theme, { getEffectiveConfig: () => ({}) }, done)
+              )({ requestRender: captureRender }, theme, createMockKeybindings(), done)
             : factory;
 
         customComponent = component as {
