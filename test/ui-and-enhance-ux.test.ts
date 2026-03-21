@@ -13,6 +13,7 @@ import {
   createAssistantResponse,
   createCommandContext,
   createCompleteResponse,
+  createMockKeybindings,
   createMockPi,
   createModel,
   createRuntimeState,
@@ -41,6 +42,37 @@ void test("compact model selector paginates and supports / search", async () => 
   const initialRender = ctx.uiState.customRenderHistory[0]?.join("\n") ?? "";
   assert.match(initialRender, /Page 1\/3/);
   assert.match(initialRender, /\/ search/);
+});
+
+void test("select dialog help line reflects the active keybindings", async () => {
+  const ctx = createCommandContext({
+    keybindingsConfig: {
+      "tui.select.up": "k",
+      "tui.select.down": "j",
+      "tui.select.pageUp": "u",
+      "tui.select.pageDown": "d",
+      "tui.select.confirm": "space",
+      "tui.select.cancel": ["q", "escape"],
+    },
+  });
+
+  await openSelectDialog(ctx, {
+    title: "Choose model",
+    items: [
+      { value: "one", label: "one" },
+      { value: "two", label: "two" },
+      { value: "three", label: "three" },
+    ],
+    pageSize: 2,
+    searchable: true,
+  });
+
+  const helpLine = ctx.uiState.customRenderHistory[0]?.at(-1) ?? "";
+  assert.match(helpLine, /K\/J move/);
+  assert.match(helpLine, /U\/D pages/);
+  assert.match(helpLine, /\/ search/);
+  assert.match(helpLine, /Space select/);
+  assert.match(helpLine, /Q\/Esc cancel/);
 });
 
 void test("selector navigation wraps from top to bottom", async () => {
@@ -142,7 +174,7 @@ void test("select dialog truncates long titles to the available width", async ()
                 bg: (_color: string, text: string) => text,
                 bold: (text: string) => text,
               },
-              undefined,
+              createMockKeybindings(),
               () => undefined
             )
           : factory;
@@ -322,7 +354,7 @@ void test("exact override manual routing picker omits the Clear option", async (
                 bg: (_color: string, text: string) => text,
                 bold: (text: string) => text,
               },
-              undefined,
+              createMockKeybindings(),
               () => undefined
             )
           : factory;
@@ -395,7 +427,7 @@ void test("exact override removal clears case-variant duplicates and uses the ra
                 bg: (_color: string, text: string) => text,
                 bold: (text: string) => text,
               },
-              undefined,
+              createMockKeybindings(),
               () => undefined
             )
           : factory;
@@ -534,7 +566,7 @@ void test("pattern override removal uses the raw pattern value and clears case-v
                 bg: (_color: string, text: string) => text,
                 bold: (text: string) => text,
               },
-              undefined,
+              createMockKeybindings(),
               () => undefined
             )
           : factory;

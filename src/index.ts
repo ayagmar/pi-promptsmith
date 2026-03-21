@@ -89,12 +89,26 @@ export function createPromptsmithExtension(
 
   const triggerDefaultShortcut = async (ctx: ExtensionContext): Promise<void> => {
     const settings = runtime.getSettings();
-    if (
-      settings.enabled &&
-      settings.shortcutEnabled &&
-      activeCustomShortcutKey &&
-      activeCustomShortcutKey !== DEFAULT_SHORTCUT_KEY
-    ) {
+    const shortcutServices = {
+      completeFn: options?.completeFn ?? complete,
+      exec: pi.exec.bind(pi),
+      sendUserMessage: pi.sendUserMessage.bind(pi),
+      refreshStatus,
+      runCancellableTask: runEnhancementWithLoader,
+      openSettings,
+    };
+
+    if (!settings.enabled) {
+      await handlePromptsmithShortcut(ctx, runtime, shortcutServices);
+      return;
+    }
+
+    if (!settings.shortcutEnabled) {
+      ctx.ui.notify("Promptsmith shortcut is disabled globally.", "info");
+      return;
+    }
+
+    if (activeCustomShortcutKey && activeCustomShortcutKey !== DEFAULT_SHORTCUT_KEY) {
       ctx.ui.notify(
         `Promptsmith shortcut is now ${formatShortcutKey(activeCustomShortcutKey)}.`,
         "info"
@@ -102,14 +116,7 @@ export function createPromptsmithExtension(
       return;
     }
 
-    await handlePromptsmithShortcut(ctx, runtime, {
-      completeFn: options?.completeFn ?? complete,
-      exec: pi.exec.bind(pi),
-      sendUserMessage: pi.sendUserMessage.bind(pi),
-      refreshStatus,
-      runCancellableTask: runEnhancementWithLoader,
-      openSettings,
-    });
+    await handlePromptsmithShortcut(ctx, runtime, shortcutServices);
   };
 
   const restorePersistedSettings = (ctx: ExtensionContext): void => {

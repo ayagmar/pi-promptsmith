@@ -9,6 +9,7 @@ import {
   type Focusable,
   type SelectItem,
 } from "@mariozechner/pi-tui";
+import { formatShortcutKey } from "../shortcut-key.js";
 
 type DialogTheme = Pick<ExtensionContext["ui"]["theme"], "fg" | "bg" | "bold">;
 
@@ -298,16 +299,53 @@ class CompactSelectDialog implements Component, Focusable {
   }
 
   private buildHelpLine(): string {
-    const parts = ["↑↓ move"];
+    const parts = [
+      formatKeybindingPair(this.keybindings, "tui.select.up", "tui.select.down", "move"),
+    ];
     if (this.getPageCount() > 1) {
-      parts.push("PgUp/PgDn pages");
+      parts.push(
+        formatKeybindingPair(this.keybindings, "tui.select.pageUp", "tui.select.pageDown", "pages")
+      );
     }
     if (this.searchable) {
       parts.push("/ search");
     }
-    parts.push("Enter select", "Esc cancel");
+    parts.push(
+      formatKeybindingHint(this.keybindings, "tui.select.confirm", "select"),
+      formatKeybindingHint(this.keybindings, "tui.select.cancel", "cancel")
+    );
     return `  ${parts.join(" · ")}`;
   }
+}
+
+type DialogKeybinding = Parameters<KeybindingsManager["getKeys"]>[0];
+
+function formatKeybindingPair(
+  keybindings: KeybindingsManager,
+  first: DialogKeybinding,
+  second: DialogKeybinding,
+  description: string
+): string {
+  return `${formatKeyLabelList(keybindings, first)}/${formatKeyLabelList(keybindings, second)} ${description}`;
+}
+
+function formatKeybindingHint(
+  keybindings: KeybindingsManager,
+  keybinding: DialogKeybinding,
+  description: string
+): string {
+  return `${formatKeyLabelList(keybindings, keybinding)} ${description}`;
+}
+
+function formatKeyLabelList(keybindings: KeybindingsManager, keybinding: DialogKeybinding): string {
+  return keybindings.getKeys(keybinding).map(formatKeyLabel).join("/");
+}
+
+function formatKeyLabel(key: string): string {
+  return formatShortcutKey(key)
+    .replace("PageUp", "PgUp")
+    .replace("PageDown", "PgDn")
+    .replace("Escape", "Esc");
 }
 
 function isNavigationKey(data: string, keybindings: KeybindingsManager): boolean {
