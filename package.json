@@ -1,6 +1,6 @@
 {
   "name": "pi-promptsmith",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Intent-aware prompt rewriter and execution-contract compiler for Pi",
   "keywords": [
     "pi-package",

@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.1](https://github.com/ayagmar/pi-promptsmith/compare/v0.3.0...v0.3.1) (2026-03-27)
+
+### Bug Fixes
+
+* **promptsmith:** support pi request auth headers ([08a1fad](https://github.com/ayagmar/pi-promptsmith/commit/08a1fad8c1462e94cf1645d0d4d971ae426d891d))
+
 ## [0.3.0](https://github.com/ayagmar/pi-promptsmith/compare/v0.2.1...v0.3.0) (2026-03-21)
 
 ### Features
