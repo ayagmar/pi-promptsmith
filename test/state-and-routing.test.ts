@@ -126,6 +126,7 @@ void test("resolveEnhancerModel validates configuration and API keys", async () 
 
   const resolved = await resolveEnhancerModel(settings, "gpt", model, ctx.modelRegistry);
   assert.equal(resolved.label, "active (openai/gpt-5)");
+  assert.equal(resolved.requestAuth.apiKey, "test-key");
 
   await assert.rejects(
     resolveEnhancerModel(
@@ -154,7 +155,7 @@ void test("resolveEnhancerModel validates configuration and API keys", async () 
   });
   await assert.rejects(
     resolveEnhancerModel(settings, "gpt", model, noKeyCtx.modelRegistry),
-    /could not resolve api credentials/i
+    /could not resolve request auth.*missing api credentials/i
   );
 });
 
