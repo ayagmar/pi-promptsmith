@@ -49,6 +49,32 @@ void test("promptsmith command enhances the current editor draft", async () => {
   assert.match(ctx.uiState.notifications.map((entry) => entry.message).join("\n"), /enhanced/i);
 });
 
+void test("promptsmith command forwards model request headers to the enhancer", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const model = createModel();
+  const ctx = createCommandContext({
+    model,
+    allModels: [model],
+    editorText: "fix this prompt",
+    requestHeaders: new Map([[`${model.provider}/${model.id}`, { "x-promptsmith-test": "1" }]]),
+  });
+  let requestOptions: { apiKey?: string; headers?: Record<string, string> } | undefined;
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, (_model, _context, options) => {
+      requestOptions = options;
+      return Promise.resolve(createCompleteResponse("Enhanced prompt"));
+    })
+  );
+
+  assert.equal(requestOptions?.apiKey, "test-key");
+  assert.deepEqual(requestOptions?.headers, { "x-promptsmith-test": "1" });
+});
+
 void test("empty editor opens settings instead of failing", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();

@@ -209,6 +209,7 @@ export function createCommandContext(options?: {
   entries?: SessionEntry[];
   allModels?: Model<Api>[];
   apiKeys?: Map<string, string | undefined>;
+  requestHeaders?: Map<string, Record<string, string> | undefined>;
   cwd?: string;
 }): ExtensionCommandContext & { uiState: MockUiState } {
   const uiState: MockUiState = {
@@ -231,6 +232,7 @@ export function createCommandContext(options?: {
   const allModels = options?.allModels ?? [options?.model ?? createModel()];
   const apiKeys =
     options?.apiKeys ?? new Map(allModels.map((model) => [modelKey(model), "test-key"]));
+  const requestHeaders = options?.requestHeaders ?? new Map<string, Record<string, string>>();
 
   const ctx = {
     hasUI: options?.hasUI ?? true,
@@ -243,7 +245,15 @@ export function createCommandContext(options?: {
     modelRegistry: {
       find: (provider: string, id: string) =>
         allModels.find((model) => model.provider === provider && model.id === id),
-      getApiKey: (model: Model<Api>) => Promise.resolve(apiKeys.get(modelKey(model))),
+      getApiKeyAndHeaders: (model: Model<Api>) => {
+        const apiKey = apiKeys.get(modelKey(model));
+        const headers = requestHeaders.get(modelKey(model));
+        if (typeof apiKey === "undefined" && typeof headers === "undefined") {
+          return Promise.resolve({ ok: false as const, error: "Missing API credentials" });
+        }
+
+        return Promise.resolve({ ok: true as const, apiKey, headers });
+      },
       getAll: () => allModels,
     },
     ui: {

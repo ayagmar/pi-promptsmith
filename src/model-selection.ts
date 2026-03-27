@@ -3,6 +3,7 @@ import type { ModelRegistry } from "@mariozechner/pi-coding-agent";
 import type {
   ModelRef,
   PromptsmithFamily,
+  PromptsmithRequestAuth,
   PromptsmithSettings,
   ResolvedEnhancerModel,
 } from "./types.js";
@@ -20,12 +21,12 @@ export async function resolveEnhancerModel(
           "Promptsmith requires an active model when enhancer-model mode is 'active'."
         );
       }
-      const apiKey = await requireApiKey(modelRegistry, activeModel);
+      const requestAuth = await resolveRequestAuth(modelRegistry, activeModel);
       return {
         mode: "active",
         family: targetFamily,
         model: activeModel,
-        apiKey,
+        requestAuth,
         label: `active (${activeModel.provider}/${activeModel.id})`,
       };
     }
@@ -88,22 +89,29 @@ async function resolveConfiguredModel(
     );
   }
 
-  const apiKey = await requireApiKey(modelRegistry, model);
+  const requestAuth = await resolveRequestAuth(modelRegistry, model);
   return {
     mode,
     family: targetFamily,
     model,
-    apiKey,
+    requestAuth,
     label: `${model.provider}/${model.id}`,
   };
 }
 
-async function requireApiKey(modelRegistry: ModelRegistry, model: Model<Api>): Promise<string> {
-  const apiKey = await modelRegistry.getApiKey(model);
-  if (!apiKey) {
+async function resolveRequestAuth(
+  modelRegistry: ModelRegistry,
+  model: Model<Api>
+): Promise<PromptsmithRequestAuth> {
+  const auth = await modelRegistry.getApiKeyAndHeaders(model);
+  if (!auth.ok) {
     throw new Error(
-      `Promptsmith could not resolve API credentials for ${model.provider}/${model.id}.`
+      `Promptsmith could not resolve request auth for ${model.provider}/${model.id}: ${auth.error}`
     );
   }
-  return apiKey;
+
+  return {
+    ...(typeof auth.apiKey === "string" ? { apiKey: auth.apiKey } : {}),
+    ...(auth.headers ? { headers: auth.headers } : {}),
+  };
 }

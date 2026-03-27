@@ -1,5 +1,11 @@
 import { clearTimeout, setTimeout } from "node:timers";
-import type { Api, AssistantMessage, Context, Model } from "@mariozechner/pi-ai";
+import type {
+  Api,
+  AssistantMessage,
+  Context,
+  Model,
+  ProviderStreamOptions,
+} from "@mariozechner/pi-ai";
 import { ENHANCER_MAX_OUTPUT_TOKENS } from "./constants.js";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { BorderedLoader } from "@mariozechner/pi-coding-agent";
@@ -28,11 +34,7 @@ import {
   requireNonEmptyDraft,
 } from "./validation.js";
 
-export type CompleteOptions = Record<string, unknown> & {
-  apiKey?: string;
-  signal?: AbortSignal;
-  maxTokens?: number;
-};
+export type CompleteOptions = ProviderStreamOptions;
 
 export type CompleteFn = (
   model: Model<Api>,
@@ -340,11 +342,11 @@ async function runCompletion(
   timeoutMs: number
 ): Promise<AssistantMessage | null> {
   const response = await Promise.race<AssistantMessage | null>([
-    completeFn(preparation.enhancerModel.model, request, {
-      apiKey: preparation.enhancerModel.apiKey,
-      signal: requestSignal,
-      maxTokens: Math.min(preparation.enhancerModel.model.maxTokens, ENHANCER_MAX_OUTPUT_TOKENS),
-    }),
+    completeFn(
+      preparation.enhancerModel.model,
+      request,
+      buildCompletionOptions(preparation, requestSignal)
+    ),
     waitForAbort(signal, null),
     waitForTimeout(timeoutSignal, timeoutMs),
   ]);
@@ -364,6 +366,20 @@ async function runCompletion(
   }
 
   return response;
+}
+
+function buildCompletionOptions(
+  preparation: EnhancementPreparation,
+  requestSignal: AbortSignal
+): CompleteOptions {
+  const { apiKey, headers } = preparation.enhancerModel.requestAuth;
+
+  return {
+    ...(typeof apiKey === "string" ? { apiKey } : {}),
+    ...(headers ? { headers } : {}),
+    signal: requestSignal,
+    maxTokens: Math.min(preparation.enhancerModel.model.maxTokens, ENHANCER_MAX_OUTPUT_TOKENS),
+  };
 }
 
 function buildRetryRequest(request: Context): Context {
