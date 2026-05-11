@@ -1,6 +1,6 @@
 # pi-promptsmith
 
-Promptsmith is a prompt-rewriting extension for [Pi](https://github.com/mariozechner/pi-coding-agent). It takes the rough draft in your Pi editor and turns it into a clearer, stronger prompt without making you leave the editor.
+Promptsmith is a prompt-rewriting extension for [Pi](https://github.com/earendil-works/pi-mono). It takes the rough draft in your Pi editor and turns it into a clearer, stronger prompt without making you leave the editor.
 
 ![Promptsmith demo](./promptsmith.gif)
 

@@ -1,5 +1,5 @@
-import type { Api, AssistantMessage, Model, UserMessage } from "@mariozechner/pi-ai";
-import type { SessionEntry } from "@mariozechner/pi-coding-agent";
+import type { Api, AssistantMessage, Model, UserMessage } from "@earendil-works/pi-ai";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
   DEFAULT_OUTPUT_RESERVE_TOKENS,
   ESTIMATED_FIXED_PROMPT_OVERHEAD_TOKENS,

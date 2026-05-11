@@ -1,5 +1,5 @@
-import type { Api, Context, Model } from "@mariozechner/pi-ai";
-import type { ExtensionContext, ModelRegistry } from "@mariozechner/pi-coding-agent";
+import type { Api, Context, Model } from "@earendil-works/pi-ai";
+import type { ExtensionContext, ModelRegistry } from "@earendil-works/pi-coding-agent";
 
 export type PromptsmithFamily = "gpt" | "claude";
 export type PromptsmithTargetFamilyMode = "auto" | PromptsmithFamily;

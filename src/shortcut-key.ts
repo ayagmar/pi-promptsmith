@@ -1,4 +1,4 @@
-import { matchesKey, type KeyId } from "@mariozechner/pi-tui";
+import { matchesKey, type KeyId } from "@earendil-works/pi-tui";
 import { DEFAULT_SHORTCUT_KEY } from "./constants.js";
 import type { PromptsmithSettings } from "./types.js";
 

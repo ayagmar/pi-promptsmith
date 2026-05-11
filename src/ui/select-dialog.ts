@@ -1,4 +1,4 @@
-import type { ExtensionContext, KeybindingsManager } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext, KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import {
   fuzzyFilter,
   Input,
@@ -8,7 +8,7 @@ import {
   type Component,
   type Focusable,
   type SelectItem,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import { formatShortcutKey } from "../shortcut-key.js";
 
 type DialogTheme = Pick<ExtensionContext["ui"]["theme"], "fg" | "bg" | "bold">;
