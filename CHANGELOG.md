@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* **promptsmith:** align GPT-style rewrites with OpenAI prompt guidance and request concise GPT enhancer output
+
+### Bug Fixes
+
+* **promptsmith:** preserve existing custom editor components when installing the Promptsmith shortcut wrapper
+
 ## [0.3.2](https://github.com/ayagmar/pi-promptsmith/compare/v0.3.1...v0.3.2) (2026-05-11)
 
 ## [0.3.1](https://github.com/ayagmar/pi-promptsmith/compare/v0.3.0...v0.3.1) (2026-03-27)

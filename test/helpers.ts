@@ -211,6 +211,7 @@ export function createCommandContext(options?: {
   apiKeys?: Map<string, string | undefined>;
   requestHeaders?: Map<string, Record<string, string> | undefined>;
   cwd?: string;
+  editorComponentFactory?: ReturnType<ExtensionContext["ui"]["getEditorComponent"]>;
 }): ExtensionCommandContext & { uiState: MockUiState } {
   const uiState: MockUiState = {
     notifications: [],
@@ -230,6 +231,7 @@ export function createCommandContext(options?: {
   };
 
   const allModels = options?.allModels ?? [options?.model ?? createModel()];
+  let editorComponentFactory = options?.editorComponentFactory;
   const apiKeys =
     options?.apiKeys ?? new Map(allModels.map((model) => [modelKey(model), "test-key"]));
   const requestHeaders = options?.requestHeaders ?? new Map<string, Record<string, string>>();
@@ -405,9 +407,11 @@ export function createCommandContext(options?: {
       pasteToEditor: (text: string) => {
         uiState.editorText = text;
       },
-      setEditorComponent: (factory: unknown) => {
+      setEditorComponent: (factory: typeof editorComponentFactory) => {
+        editorComponentFactory = factory;
         uiState.editorComponentHistory.push(factory ? "set" : "clear");
       },
+      getEditorComponent: () => editorComponentFactory,
       theme: {
         fg: (_color: string, text: string) => text,
         bg: (_color: string, text: string) => text,

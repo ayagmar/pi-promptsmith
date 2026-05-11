@@ -104,6 +104,61 @@ void test("custom editor is not reinstalled when the shortcut setting is unchang
   }
 });
 
+void test("session shutdown restores an existing custom editor component", async () => {
+  const originalHome = process.env.HOME;
+  const tempHome = mkdtempSync(join(tmpdir(), "promptsmith-home-"));
+  process.env.HOME = tempHome;
+
+  try {
+    const settingsPath = join(tempHome, ".pi", "agent", "promptsmith-settings.json");
+    mkdirSync(join(tempHome, ".pi", "agent"), { recursive: true });
+    writeFileSync(
+      settingsPath,
+      `${JSON.stringify(
+        {
+          ...DEFAULT_SETTINGS,
+          shortcutKey: "ctrl+alt+p",
+        },
+        null,
+        2
+      )}\n`,
+      "utf8"
+    );
+
+    const existingFactory = () => ({
+      render: () => [],
+      invalidate: () => undefined,
+      handleInput: () => undefined,
+      getText: () => "",
+      setText: () => undefined,
+    });
+    const harness = createMockPi();
+    createPromptsmithExtension(harness.pi);
+
+    const ctx = createCommandContext({
+      editorText: "draft",
+      editorComponentFactory: existingFactory,
+    });
+    for (const handler of harness.events.get("session_start") ?? []) {
+      await handler({}, ctx);
+    }
+    assert.notEqual(ctx.ui.getEditorComponent(), existingFactory);
+
+    for (const handler of harness.events.get("session_shutdown") ?? []) {
+      await handler({}, ctx);
+    }
+
+    assert.equal(ctx.ui.getEditorComponent(), existingFactory);
+    assert.deepEqual(ctx.uiState.editorComponentHistory, ["set", "set"]);
+  } finally {
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
+  }
+});
+
 void test("session shutdown clears the custom editor component", async () => {
   const originalHome = process.env.HOME;
   const tempHome = mkdtempSync(join(tmpdir(), "promptsmith-home-"));

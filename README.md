@@ -109,7 +109,7 @@ It is intentionally **not** a giant fixed template. Promptsmith keeps concrete u
 
 Family-aware behavior still applies:
 
-- **GPT-style** rewrites stay natural and compact
+- **GPT-style** rewrites follow OpenAI prompt guidance: outcome-first, compact, explicit about success criteria/constraints/output/stop rules when useful, and light on process scaffolding
 - **Claude-style** rewrites can use stronger structure, including XML-like sections when that genuinely helps
 
 ## Examples
@@ -294,6 +294,7 @@ Promptsmith keeps a few important guarantees:
 - only one enhancement runs at a time
 - output must contain exactly one sentinel block
 - invalid model-output failures say whether the model missed the sentinel, emitted multiple blocks, added extra text, or returned an empty block
+- GPT enhancer calls request concise text output where the Pi/OpenAI provider supports verbosity controls
 - a bad first model response is retried once with a stricter format reminder before Promptsmith fails closed
 - single collapsed Pi paste markers can be recovered from the clipboard; multi-marker drafts fail closed
 - oversized drafts fail clearly instead of being truncated silently

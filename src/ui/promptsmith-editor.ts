@@ -1,31 +1,32 @@
 import { CustomEditor, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
-import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
+import type { EditorComponent, EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { matchesCustomShortcut } from "../shortcut-key.js";
 import type { PromptsmithSettings } from "../types.js";
 
-export class PromptsmithEditor extends CustomEditor {
-  constructor(
-    tui: TUI,
-    theme: EditorTheme,
-    private readonly promptsmithKeybindings: KeybindingsManager,
-    private readonly getSettings: () => PromptsmithSettings,
-    private readonly onPromptsmithShortcut: () => void
-  ) {
-    super(tui, theme, promptsmithKeybindings);
-  }
+export function createBasePromptsmithEditor(
+  tui: TUI,
+  theme: EditorTheme,
+  keybindings: KeybindingsManager
+): EditorComponent {
+  return new CustomEditor(tui, theme, keybindings);
+}
 
-  handleInput(data: string): void {
-    if (
-      matchesCustomShortcut(
-        data,
-        this.getSettings(),
-        this.promptsmithKeybindings.getEffectiveConfig()
-      )
-    ) {
-      this.onPromptsmithShortcut();
+export function attachPromptsmithShortcut(
+  editor: EditorComponent,
+  keybindings: KeybindingsManager,
+  getSettings: () => PromptsmithSettings,
+  onPromptsmithShortcut: () => void
+): EditorComponent {
+  const handleBaseInput = editor.handleInput.bind(editor);
+
+  editor.handleInput = (data: string): void => {
+    if (matchesCustomShortcut(data, getSettings(), keybindings.getEffectiveConfig())) {
+      onPromptsmithShortcut();
       return;
     }
 
-    super.handleInput(data);
-  }
+    handleBaseInput(data);
+  };
+
+  return editor;
 }

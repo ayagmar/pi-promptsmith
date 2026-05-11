@@ -377,9 +377,25 @@ function buildCompletionOptions(
   return {
     ...(typeof apiKey === "string" ? { apiKey } : {}),
     ...(headers ? { headers } : {}),
+    ...buildGptCompletionOptions(preparation.enhancerModel.model),
     signal: requestSignal,
     maxTokens: Math.min(preparation.enhancerModel.model.maxTokens, ENHANCER_MAX_OUTPUT_TOKENS),
   };
+}
+
+function buildGptCompletionOptions(model: Model<Api>): CompleteOptions {
+  return isGptModel(model) ? { textVerbosity: "low" } : {};
+}
+
+function isGptModel(model: Model<Api>): boolean {
+  const provider = model.provider.toLowerCase();
+  const id = model.id.toLowerCase();
+  return (
+    provider === "openai" ||
+    provider === "openai-codex" ||
+    id.startsWith("gpt") ||
+    /^o[1-9]/.test(id)
+  );
 }
 
 function buildRetryRequest(request: Context): Context {
