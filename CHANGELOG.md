@@ -1,5 +1,7 @@
 # Changelog
 
+## [0.3.2](https://github.com/ayagmar/pi-promptsmith/compare/v0.3.1...v0.3.2) (2026-05-11)
+
 ## [0.3.1](https://github.com/ayagmar/pi-promptsmith/compare/v0.3.0...v0.3.1) (2026-03-27)
 
 ### Bug Fixes
