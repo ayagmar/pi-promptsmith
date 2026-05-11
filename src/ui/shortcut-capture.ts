@@ -1,5 +1,5 @@
-import { parseKey, truncateToWidth, type Component } from "@mariozechner/pi-tui";
-import type { ExtensionContext, KeybindingsManager } from "@mariozechner/pi-coding-agent";
+import { parseKey, truncateToWidth, type Component } from "@earendil-works/pi-tui";
+import type { ExtensionContext, KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_SHORTCUT_KEY } from "../constants.js";
 import { formatShortcutKey, validateShortcutKey } from "../shortcut-key.js";
 

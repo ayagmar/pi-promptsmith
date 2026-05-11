@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { visibleWidth } from "@mariozechner/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { handlePromptsmithCommand } from "../src/commands.js";
 import { resolveEditorDraft } from "../src/editor-draft.js";
 import { PromptsmithRuntimeState } from "../src/state.js";

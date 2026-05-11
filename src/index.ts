@@ -1,5 +1,5 @@
-import { complete } from "@mariozechner/pi-ai";
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { complete } from "@earendil-works/pi-ai";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { CompleteFn } from "./enhance.js";
 import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "./constants.js";
 import { getPromptsmithArgumentCompletions, handlePromptsmithCommand } from "./commands.js";
@@ -127,13 +127,7 @@ export function createPromptsmithExtension(
   pi.on("session_start", (_event, ctx) => {
     restorePersistedSettings(ctx);
   });
-  pi.on("session_switch", (_event, ctx) => {
-    restorePersistedSettings(ctx);
-  });
   pi.on("session_tree", (_event, ctx) => {
-    restorePersistedSettings(ctx);
-  });
-  pi.on("session_fork", (_event, ctx) => {
     restorePersistedSettings(ctx);
   });
   pi.on("model_select", (_event, ctx) => {

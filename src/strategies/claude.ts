@@ -1,4 +1,4 @@
-import type { Context, Message } from "@mariozechner/pi-ai";
+import type { Context, Message } from "@earendil-works/pi-ai";
 import { buildStrategyInstructions } from "../contracts.js";
 import { buildSharedContextSections, buildSharedSystemPrompt } from "./shared.js";
 import type { PromptsmithContextPayload } from "../types.js";

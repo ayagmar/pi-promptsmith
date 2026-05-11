@@ -1,5 +1,5 @@
-import { CustomEditor, type KeybindingsManager } from "@mariozechner/pi-coding-agent";
-import type { EditorTheme, TUI } from "@mariozechner/pi-tui";
+import { CustomEditor, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
+import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 import { matchesCustomShortcut } from "../shortcut-key.js";
 import type { PromptsmithSettings } from "../types.js";
 

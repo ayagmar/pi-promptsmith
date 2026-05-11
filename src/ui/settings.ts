@@ -1,4 +1,4 @@
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { PromptsmithRuntimeState } from "../state.js";
 import { detectRuntimeSupport } from "../validation.js";
 import {

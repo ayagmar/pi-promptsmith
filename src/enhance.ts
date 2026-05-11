@@ -5,10 +5,10 @@ import type {
   Context,
   Model,
   ProviderStreamOptions,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import { ENHANCER_MAX_OUTPUT_TOKENS } from "./constants.js";
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { BorderedLoader } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { BorderedLoader } from "@earendil-works/pi-coding-agent";
 import { buildPromptContext } from "./context.js";
 import { resolveEditorDraft } from "./editor-draft.js";
 import { resolveEnhancerModel } from "./model-selection.js";

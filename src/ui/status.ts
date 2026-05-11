@@ -1,4 +1,4 @@
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { EXTENSION_COMMAND, EXTENSION_NAME, MAX_STATUS_MODEL_ID_LENGTH } from "../constants.js";
 import { formatShortcutKey } from "../shortcut-key.js";
 import { buildEnhancerModeLabel } from "../enhance.js";
