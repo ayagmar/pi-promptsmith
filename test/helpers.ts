@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Api, AssistantMessage, Model } from "@earendil-works/pi-ai";
@@ -187,32 +187,12 @@ export function createRuntimeState(): PromptsmithRuntimeState {
   );
 }
 
-export async function withPersistedSettings(
-  overrides: Partial<PromptsmithSettings>,
-  callback: (tempHome: string) => Promise<void> | void
-): Promise<void> {
-  const originalHome = process.env.HOME;
-  const tempHome = mkdtempSync(join(tmpdir(), "promptsmith-home-"));
-  process.env.HOME = tempHome;
-
-  try {
-    const agentDir = join(tempHome, ".pi", "agent");
-    mkdirSync(agentDir, { recursive: true });
-    writeFileSync(
-      join(agentDir, "promptsmith-settings.json"),
-      `${JSON.stringify({ ...DEFAULT_SETTINGS, ...overrides }, null, 2)}\n`,
-      "utf8"
-    );
-
-    await callback(tempHome);
-  } finally {
-    if (originalHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = originalHome;
-    }
-    rmSync(tempHome, { recursive: true, force: true });
-  }
+export function createPersistedRuntimeState(
+  overrides: Partial<PromptsmithSettings>
+): PromptsmithRuntimeState {
+  const runtime = createRuntimeState();
+  runtime.persistSettings({ ...DEFAULT_SETTINGS, ...overrides });
+  return runtime;
 }
 
 export function createModel(overrides?: Partial<Model<Api>>): Model<Api> {

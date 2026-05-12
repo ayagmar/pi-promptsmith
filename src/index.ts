@@ -17,9 +17,9 @@ export default function promptsmithExtension(pi: ExtensionAPI): void {
 
 export function createPromptsmithExtension(
   pi: ExtensionAPI,
-  options?: { completeFn?: CompleteFn }
+  options?: { completeFn?: CompleteFn; runtime?: PromptsmithRuntimeState }
 ): void {
-  const runtime = new PromptsmithRuntimeState();
+  const runtime = options?.runtime ?? new PromptsmithRuntimeState();
   let ownsEditorComponent = false;
   let previousEditorFactory: ReturnType<ExtensionContext["ui"]["getEditorComponent"]>;
   let installedCustomShortcutKey: string | undefined;
