@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.0](https://github.com/ayagmar/pi-promptsmith/compare/v0.3.2...v0.4.0) (2026-05-12)
+
+### Features
+
+* **promptsmith:** align GPT rewrites with OpenAI guidance ([799f39c](https://github.com/ayagmar/pi-promptsmith/commit/799f39c4f58f675be743f08d67b140560cdcfff2))
+
+### Bug Fixes
+
+* **promptsmith:** scope Codex request options ([c7b9c3c](https://github.com/ayagmar/pi-promptsmith/commit/c7b9c3c460e99e7651f23b059aa916216eb56a35))
+
 ## Unreleased
 
 ### Features
