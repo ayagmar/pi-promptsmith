@@ -7,7 +7,7 @@ import { runEnhancementWithLoader } from "./enhance.js";
 import { formatShortcutKey, getCustomShortcutKey } from "./shortcut-key.js";
 import { PromptsmithRuntimeState } from "./state.js";
 import { handlePromptsmithShortcut } from "./shortcut.js";
-import { PromptsmithEditor } from "./ui/promptsmith-editor.js";
+import { attachPromptsmithShortcut, createBasePromptsmithEditor } from "./ui/promptsmith-editor.js";
 import { openSettingsUi } from "./ui/settings.js";
 import { refreshStatusLine } from "./ui/status.js";
 
@@ -17,10 +17,11 @@ export default function promptsmithExtension(pi: ExtensionAPI): void {
 
 export function createPromptsmithExtension(
   pi: ExtensionAPI,
-  options?: { completeFn?: CompleteFn }
+  options?: { completeFn?: CompleteFn; runtime?: PromptsmithRuntimeState }
 ): void {
-  const runtime = new PromptsmithRuntimeState();
+  const runtime = options?.runtime ?? new PromptsmithRuntimeState();
   let ownsEditorComponent = false;
+  let previousEditorFactory: ReturnType<ExtensionContext["ui"]["getEditorComponent"]>;
   let installedCustomShortcutKey: string | undefined;
   let activeCustomShortcutKey: string | undefined;
 
@@ -31,7 +32,8 @@ export function createPromptsmithExtension(
       return;
     }
 
-    ctx.ui.setEditorComponent(undefined);
+    ctx.ui.setEditorComponent(previousEditorFactory);
+    previousEditorFactory = undefined;
     ownsEditorComponent = false;
   };
 
@@ -50,8 +52,13 @@ export function createPromptsmithExtension(
       return;
     }
 
+    const baseEditorFactory = ownsEditorComponent
+      ? previousEditorFactory
+      : ctx.ui.getEditorComponent();
+
     installedCustomShortcutKey = shortcutKey;
     activeCustomShortcutKey = undefined;
+    previousEditorFactory = baseEditorFactory;
     ownsEditorComponent = true;
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
       activeCustomShortcutKey = getCustomShortcutKey(
@@ -59,9 +66,12 @@ export function createPromptsmithExtension(
         keybindings.getEffectiveConfig()
       );
 
-      return new PromptsmithEditor(
-        tui,
-        theme,
+      const baseEditor =
+        baseEditorFactory?.(tui, theme, keybindings) ??
+        createBasePromptsmithEditor(tui, theme, keybindings);
+
+      return attachPromptsmithShortcut(
+        baseEditor,
         keybindings,
         () => runtime.getSettings(),
         () => {

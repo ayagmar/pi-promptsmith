@@ -1,7 +1,10 @@
 import { buildSentinelReminder } from "../parser.js";
 import type { PromptsmithContextPayload } from "../types.js";
 
-export function buildSharedSystemPrompt(targetStyle: "GPT-style" | "Claude-style"): string {
+export function buildSharedSystemPrompt(
+  targetStyle: "GPT-style" | "Claude-style",
+  extraInstructions: string[] = []
+): string {
   return [
     `You are Promptsmith, an expert ${targetStyle} prompt rewriter.`,
     "Follow the resolved rewrite mode from the provided context.",
@@ -12,6 +15,7 @@ export function buildSharedSystemPrompt(targetStyle: "GPT-style" | "Claude-style
     "Do not invent facts, requirements, files, commands, or context that the user did not provide.",
     "Avoid speculative implementation details, generic filler, and duplicated sections.",
     "Keep the output concise and natural for the target model family.",
+    ...extraInstructions,
     "Do not add commentary about your rewrite.",
     "Do not use tools.",
     buildSentinelReminder(),

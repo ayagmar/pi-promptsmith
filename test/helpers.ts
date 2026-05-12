@@ -9,8 +9,9 @@ import type {
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { matchesKey } from "@earendil-works/pi-tui";
-import { SENTINEL_CLOSE, SENTINEL_OPEN } from "../src/constants.js";
+import { DEFAULT_SETTINGS, SENTINEL_CLOSE, SENTINEL_OPEN } from "../src/constants.js";
 import { PromptsmithRuntimeState } from "../src/state.js";
+import type { PromptsmithSettings } from "../src/types.js";
 
 export interface MockPiHarness {
   pi: ExtensionAPI;
@@ -22,6 +23,12 @@ export interface MockPiHarness {
     options: { deliverAs?: "steer" | "followUp" } | undefined;
   }[];
 }
+
+type EditorComponentFactory = NonNullable<ReturnType<ExtensionContext["ui"]["getEditorComponent"]>>;
+
+export type EditorComponentHistoryEntry =
+  | { kind: "set"; factory: EditorComponentFactory }
+  | { kind: "clear" };
 
 export interface MockUiState {
   notifications: { message: string; type: "info" | "warning" | "error" | undefined }[];
@@ -36,7 +43,7 @@ export interface MockUiState {
   customOptionsHistory: string[][];
   customRenderHistory: string[][];
   customInputSequence: string[];
-  editorComponentHistory: ("set" | "clear")[];
+  editorComponentHistory: EditorComponentHistoryEntry[];
   themeCount: number;
 }
 
@@ -180,6 +187,14 @@ export function createRuntimeState(): PromptsmithRuntimeState {
   );
 }
 
+export function createPersistedRuntimeState(
+  overrides: Partial<PromptsmithSettings>
+): PromptsmithRuntimeState {
+  const runtime = createRuntimeState();
+  runtime.persistSettings({ ...DEFAULT_SETTINGS, ...overrides });
+  return runtime;
+}
+
 export function createModel(overrides?: Partial<Model<Api>>): Model<Api> {
   return {
     id: "gpt-5",
@@ -211,6 +226,7 @@ export function createCommandContext(options?: {
   apiKeys?: Map<string, string | undefined>;
   requestHeaders?: Map<string, Record<string, string> | undefined>;
   cwd?: string;
+  editorComponentFactory?: EditorComponentFactory;
 }): ExtensionCommandContext & { uiState: MockUiState } {
   const uiState: MockUiState = {
     notifications: [],
@@ -230,6 +246,7 @@ export function createCommandContext(options?: {
   };
 
   const allModels = options?.allModels ?? [options?.model ?? createModel()];
+  let editorComponentFactory = options?.editorComponentFactory;
   const apiKeys =
     options?.apiKeys ?? new Map(allModels.map((model) => [modelKey(model), "test-key"]));
   const requestHeaders = options?.requestHeaders ?? new Map<string, Record<string, string>>();
@@ -405,9 +422,11 @@ export function createCommandContext(options?: {
       pasteToEditor: (text: string) => {
         uiState.editorText = text;
       },
-      setEditorComponent: (factory: unknown) => {
-        uiState.editorComponentHistory.push(factory ? "set" : "clear");
+      setEditorComponent: (factory: typeof editorComponentFactory) => {
+        editorComponentFactory = factory;
+        uiState.editorComponentHistory.push(factory ? { kind: "set", factory } : { kind: "clear" });
       },
+      getEditorComponent: () => editorComponentFactory,
       theme: {
         fg: (_color: string, text: string) => text,
         bg: (_color: string, text: string) => text,

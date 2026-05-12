@@ -157,6 +157,28 @@ void test("buildPromptContext caps the safe input budget to the enhancer model u
   );
 });
 
+void test("gpt strategy request includes OpenAI prompt guidance", () => {
+  const request = buildGptStrategyRequest(
+    createPromptContext({ effectiveRewriteMode: "execution-contract", intent: "research" })
+  );
+  const text = `${request.systemPrompt}\n${extractUserText(request)}`;
+
+  assert.match(text, /OpenAI prompt guidance/i);
+  assert.match(text, /outcome-first/i);
+  assert.match(text, /retrieval budget/i);
+  assert.match(text, /stop rules/i);
+});
+
+void test("claude strategy request does not include OpenAI-specific guidance", () => {
+  const request = buildClaudeStrategyRequest(
+    createPromptContext({ effectiveRewriteMode: "execution-contract", intent: "research" })
+  );
+  const text = `${request.systemPrompt}\n${extractUserText(request)}`;
+
+  assert.doesNotMatch(text, /OpenAI prompt guidance/i);
+  assert.doesNotMatch(text, /retrieval budget/i);
+});
+
 void test("gpt strategy request changes instructions between plain and execution-contract modes", () => {
   const plainRequest = buildGptStrategyRequest(
     createPromptContext({ effectiveRewriteMode: "plain", intent: "explain" })
