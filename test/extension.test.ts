@@ -1,11 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { DEFAULT_SETTINGS, DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "../src/constants.js";
+import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "../src/constants.js";
 import { createPromptsmithExtension } from "../src/index.js";
-import { createCommandContext, createMockPi } from "./helpers.js";
+import { createCommandContext, createMockPi, withPersistedSettings } from "./helpers.js";
 
 void test("extension registers the promptsmith command and shortcut", () => {
   const harness = createMockPi();
@@ -18,27 +15,7 @@ void test("extension registers the promptsmith command and shortcut", () => {
 });
 
 void test("default shortcut does not ignore disabled custom shortcut settings", async () => {
-  const originalHome = process.env.HOME;
-  const tempHome = mkdtempSync(join(tmpdir(), "promptsmith-home-"));
-  process.env.HOME = tempHome;
-
-  try {
-    const settingsPath = join(tempHome, ".pi", "agent", "promptsmith-settings.json");
-    mkdirSync(join(tempHome, ".pi", "agent"), { recursive: true });
-    writeFileSync(
-      settingsPath,
-      `${JSON.stringify(
-        {
-          ...DEFAULT_SETTINGS,
-          shortcutKey: "ctrl+alt+p",
-          shortcutEnabled: false,
-        },
-        null,
-        2
-      )}\n`,
-      "utf8"
-    );
-
+  await withPersistedSettings({ shortcutKey: "ctrl+alt+p", shortcutEnabled: false }, async () => {
     const harness = createMockPi();
     createPromptsmithExtension(harness.pi);
 
@@ -53,36 +30,11 @@ void test("default shortcut does not ignore disabled custom shortcut settings", 
     const messages = ctx.uiState.notifications.map((entry) => entry.message).join("\n");
     assert.match(messages, /shortcut is disabled globally/i);
     assert.doesNotMatch(messages, /shortcut is now ctrl\+alt\+p/i);
-  } finally {
-    if (originalHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = originalHome;
-    }
-  }
+  });
 });
 
 void test("custom editor is not reinstalled when the shortcut setting is unchanged", async () => {
-  const originalHome = process.env.HOME;
-  const tempHome = mkdtempSync(join(tmpdir(), "promptsmith-home-"));
-  process.env.HOME = tempHome;
-
-  try {
-    const settingsPath = join(tempHome, ".pi", "agent", "promptsmith-settings.json");
-    mkdirSync(join(tempHome, ".pi", "agent"), { recursive: true });
-    writeFileSync(
-      settingsPath,
-      `${JSON.stringify(
-        {
-          ...DEFAULT_SETTINGS,
-          shortcutKey: "ctrl+alt+p",
-        },
-        null,
-        2
-      )}\n`,
-      "utf8"
-    );
-
+  await withPersistedSettings({ shortcutKey: "ctrl+alt+p" }, async () => {
     const harness = createMockPi();
     createPromptsmithExtension(harness.pi);
 
@@ -94,37 +46,13 @@ void test("custom editor is not reinstalled when the shortcut setting is unchang
       await handler({}, ctx);
     }
 
-    assert.deepEqual(ctx.uiState.editorComponentHistory, ["set"]);
-  } finally {
-    if (originalHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = originalHome;
-    }
-  }
+    assert.equal(ctx.uiState.editorComponentHistory.length, 1);
+    assert.equal(ctx.uiState.editorComponentHistory[0]?.kind, "set");
+  });
 });
 
 void test("session shutdown restores an existing custom editor component", async () => {
-  const originalHome = process.env.HOME;
-  const tempHome = mkdtempSync(join(tmpdir(), "promptsmith-home-"));
-  process.env.HOME = tempHome;
-
-  try {
-    const settingsPath = join(tempHome, ".pi", "agent", "promptsmith-settings.json");
-    mkdirSync(join(tempHome, ".pi", "agent"), { recursive: true });
-    writeFileSync(
-      settingsPath,
-      `${JSON.stringify(
-        {
-          ...DEFAULT_SETTINGS,
-          shortcutKey: "ctrl+alt+p",
-        },
-        null,
-        2
-      )}\n`,
-      "utf8"
-    );
-
+  await withPersistedSettings({ shortcutKey: "ctrl+alt+p" }, async () => {
     const existingFactory = () => ({
       render: () => [],
       invalidate: () => undefined,
@@ -148,38 +76,18 @@ void test("session shutdown restores an existing custom editor component", async
       await handler({}, ctx);
     }
 
+    const history = ctx.uiState.editorComponentHistory;
     assert.equal(ctx.ui.getEditorComponent(), existingFactory);
-    assert.deepEqual(ctx.uiState.editorComponentHistory, ["set", "set"]);
-  } finally {
-    if (originalHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = originalHome;
-    }
-  }
+    assert.equal(history.length, 2);
+    assert.equal(history[0]?.kind, "set");
+    assert.equal(history[1]?.kind, "set");
+    assert.notEqual(history[0]?.kind === "set" ? history[0].factory : undefined, existingFactory);
+    assert.equal(history[1]?.kind === "set" ? history[1].factory : undefined, existingFactory);
+  });
 });
 
 void test("session shutdown clears the custom editor component", async () => {
-  const originalHome = process.env.HOME;
-  const tempHome = mkdtempSync(join(tmpdir(), "promptsmith-home-"));
-  process.env.HOME = tempHome;
-
-  try {
-    const settingsPath = join(tempHome, ".pi", "agent", "promptsmith-settings.json");
-    mkdirSync(join(tempHome, ".pi", "agent"), { recursive: true });
-    writeFileSync(
-      settingsPath,
-      `${JSON.stringify(
-        {
-          ...DEFAULT_SETTINGS,
-          shortcutKey: "ctrl+alt+p",
-        },
-        null,
-        2
-      )}\n`,
-      "utf8"
-    );
-
+  await withPersistedSettings({ shortcutKey: "ctrl+alt+p" }, async () => {
     const harness = createMockPi();
     createPromptsmithExtension(harness.pi);
 
@@ -191,12 +99,9 @@ void test("session shutdown clears the custom editor component", async () => {
       await handler({}, ctx);
     }
 
-    assert.deepEqual(ctx.uiState.editorComponentHistory, ["set", "clear"]);
-  } finally {
-    if (originalHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = originalHome;
-    }
-  }
+    assert.deepEqual(
+      ctx.uiState.editorComponentHistory.map((entry) => entry.kind),
+      ["set", "clear"]
+    );
+  });
 });

@@ -75,10 +75,14 @@ void test("promptsmith command forwards model request headers to the enhancer", 
   assert.deepEqual(requestOptions?.headers, { "x-promptsmith-test": "1" });
 });
 
-void test("promptsmith command asks GPT enhancer models for concise text", async () => {
+void test("promptsmith command asks Codex Responses enhancer models for concise text", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
-  const model = createModel({ provider: "openai", id: "gpt-5.5" });
+  const model = createModel({
+    provider: "openai-codex",
+    id: "gpt-5.5",
+    api: "openai-codex-responses",
+  });
   const ctx = createCommandContext({ model, allModels: [model], editorText: "fix this prompt" });
   let requestOptions: Record<string, unknown> | undefined;
 
@@ -93,6 +97,26 @@ void test("promptsmith command asks GPT enhancer models for concise text", async
   );
 
   assert.equal(requestOptions?.textVerbosity, "low");
+});
+
+void test("promptsmith command does not add Codex-only options to OpenAI Responses enhancers", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const model = createModel({ provider: "openai", id: "gpt-5.5", api: "openai-responses" });
+  const ctx = createCommandContext({ model, allModels: [model], editorText: "fix this prompt" });
+  let requestOptions: Record<string, unknown> | undefined;
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, (_model, _context, options) => {
+      requestOptions = options;
+      return Promise.resolve(createCompleteResponse("Enhanced prompt"));
+    })
+  );
+
+  assert.equal(requestOptions?.textVerbosity, undefined);
 });
 
 void test("promptsmith command does not add GPT-only request options to Claude enhancers", async () => {

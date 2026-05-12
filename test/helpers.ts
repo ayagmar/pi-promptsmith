@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Api, AssistantMessage, Model } from "@earendil-works/pi-ai";
@@ -9,8 +9,9 @@ import type {
   SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { matchesKey } from "@earendil-works/pi-tui";
-import { SENTINEL_CLOSE, SENTINEL_OPEN } from "../src/constants.js";
+import { DEFAULT_SETTINGS, SENTINEL_CLOSE, SENTINEL_OPEN } from "../src/constants.js";
 import { PromptsmithRuntimeState } from "../src/state.js";
+import type { PromptsmithSettings } from "../src/types.js";
 
 export interface MockPiHarness {
   pi: ExtensionAPI;
@@ -22,6 +23,12 @@ export interface MockPiHarness {
     options: { deliverAs?: "steer" | "followUp" } | undefined;
   }[];
 }
+
+type EditorComponentFactory = NonNullable<ReturnType<ExtensionContext["ui"]["getEditorComponent"]>>;
+
+export type EditorComponentHistoryEntry =
+  | { kind: "set"; factory: EditorComponentFactory }
+  | { kind: "clear" };
 
 export interface MockUiState {
   notifications: { message: string; type: "info" | "warning" | "error" | undefined }[];
@@ -36,7 +43,7 @@ export interface MockUiState {
   customOptionsHistory: string[][];
   customRenderHistory: string[][];
   customInputSequence: string[];
-  editorComponentHistory: ("set" | "clear")[];
+  editorComponentHistory: EditorComponentHistoryEntry[];
   themeCount: number;
 }
 
@@ -180,6 +187,34 @@ export function createRuntimeState(): PromptsmithRuntimeState {
   );
 }
 
+export async function withPersistedSettings(
+  overrides: Partial<PromptsmithSettings>,
+  callback: (tempHome: string) => Promise<void> | void
+): Promise<void> {
+  const originalHome = process.env.HOME;
+  const tempHome = mkdtempSync(join(tmpdir(), "promptsmith-home-"));
+  process.env.HOME = tempHome;
+
+  try {
+    const agentDir = join(tempHome, ".pi", "agent");
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(
+      join(agentDir, "promptsmith-settings.json"),
+      `${JSON.stringify({ ...DEFAULT_SETTINGS, ...overrides }, null, 2)}\n`,
+      "utf8"
+    );
+
+    await callback(tempHome);
+  } finally {
+    if (originalHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = originalHome;
+    }
+    rmSync(tempHome, { recursive: true, force: true });
+  }
+}
+
 export function createModel(overrides?: Partial<Model<Api>>): Model<Api> {
   return {
     id: "gpt-5",
@@ -211,7 +246,7 @@ export function createCommandContext(options?: {
   apiKeys?: Map<string, string | undefined>;
   requestHeaders?: Map<string, Record<string, string> | undefined>;
   cwd?: string;
-  editorComponentFactory?: ReturnType<ExtensionContext["ui"]["getEditorComponent"]>;
+  editorComponentFactory?: EditorComponentFactory;
 }): ExtensionCommandContext & { uiState: MockUiState } {
   const uiState: MockUiState = {
     notifications: [],
@@ -409,7 +444,7 @@ export function createCommandContext(options?: {
       },
       setEditorComponent: (factory: typeof editorComponentFactory) => {
         editorComponentFactory = factory;
-        uiState.editorComponentHistory.push(factory ? "set" : "clear");
+        uiState.editorComponentHistory.push(factory ? { kind: "set", factory } : { kind: "clear" });
       },
       getEditorComponent: () => editorComponentFactory,
       theme: {

@@ -384,7 +384,11 @@ function buildCompletionOptions(
 }
 
 function buildGptCompletionOptions(model: Model<Api>): CompleteOptions {
-  return isGptModel(model) ? { textVerbosity: "low" } : {};
+  if (!isGptModel(model)) {
+    return {};
+  }
+
+  return model.api === "openai-codex-responses" ? { textVerbosity: "low" } : {};
 }
 
 function isGptModel(model: Model<Api>): boolean {

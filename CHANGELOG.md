@@ -4,7 +4,7 @@
 
 ### Features
 
-* **promptsmith:** align GPT-style rewrites with OpenAI prompt guidance and request concise GPT enhancer output
+* **promptsmith:** align GPT-style rewrites with OpenAI prompt guidance and request concise Codex Responses enhancer output
 
 ### Bug Fixes
 
