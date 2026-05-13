@@ -257,7 +257,7 @@ There are two ways to see status:
 - timeout
 - current draft intent and effective rewrite mode, when the editor is readable
 - the last enhancement outcome, enhancer model, and whether a format-retry was needed
-- the last enhancement failure detail when a model breaks the sentinel contract
+- the last enhancement failure detail for sentinel-contract or provider/API stop errors
 
 Outside interactive editor mode, draft-aware status degrades gracefully.
 
@@ -294,6 +294,7 @@ Promptsmith keeps a few important guarantees:
 - only one enhancement runs at a time
 - output must contain exactly one sentinel block
 - invalid model-output failures say whether the model missed the sentinel, emitted multiple blocks, added extra text, or returned an empty block
+- provider/API stop errors are reported directly instead of being masked as empty sentinel failures
 - GPT enhancer calls request concise text output where the Pi/OpenAI provider supports verbosity controls
 - a bad first model response is retried once with a stricter format reminder before Promptsmith fails closed
 - single collapsed Pi paste markers can be recovered from the clipboard; multi-marker drafts fail closed

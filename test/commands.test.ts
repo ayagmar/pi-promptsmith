@@ -143,6 +143,55 @@ void test("promptsmith command does not add GPT-only request options to Claude e
   assert.equal(requestOptions?.textVerbosity, undefined);
 });
 
+void test("promptsmith command normalizes OpenRouter MiniMax enhancer payloads", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const model = createModel({
+    provider: "openrouter",
+    id: "minimax/minimax-m2.5",
+    api: "openai-completions",
+    baseUrl: "https://openrouter.ai/api/v1",
+  });
+  const ctx = createCommandContext({ model, allModels: [model], editorText: "fix this prompt" });
+  let requestOptions: Record<string, unknown> | undefined;
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, (_model, _context, options) => {
+      requestOptions = options;
+      return Promise.resolve(createCompleteResponse("Enhanced prompt"));
+    })
+  );
+
+  const onPayload = requestOptions?.onPayload;
+  assert.equal(typeof onPayload, "function");
+
+  const normalized = await (onPayload as (payload: unknown) => unknown)({
+    model: "minimax/minimax-m2.5",
+    messages: [
+      { role: "developer", content: "system instructions" },
+      { role: "user", content: "draft" },
+    ],
+    stream: true,
+    store: false,
+    max_completion_tokens: 1200,
+    reasoning: { effort: "none" },
+  });
+
+  assert.deepEqual(normalized, {
+    model: "minimax/minimax-m2.5",
+    messages: [
+      { role: "system", content: "system instructions" },
+      { role: "user", content: "draft" },
+    ],
+    stream: true,
+    max_tokens: 1200,
+    reasoning: { effort: "none" },
+  });
+});
+
 void test("empty editor opens settings instead of failing", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
@@ -507,6 +556,62 @@ void test("invalid model output errors include model-specific diagnostics", asyn
   assert.match(message, /primary response preview: sure — here is the rewrite/i);
   assert.match(message, /retry response preview:/i);
   assert.match(message, /try \/promptsmith status/i);
+});
+
+void test("thinking-only sentinel responses can still enhance the draft", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel(), editorText: "original draft" });
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () =>
+      Promise.resolve({
+        ...createAssistantResponse(""),
+        content: [
+          {
+            type: "thinking" as const,
+            thinking:
+              "<promptsmith-enhanced-prompt>Recovered from thinking-only content</promptsmith-enhanced-prompt>",
+          },
+        ],
+      })
+    )
+  );
+
+  assert.equal(ctx.uiState.editorText, "Recovered from thinking-only content");
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /enhanced the current draft/i);
+});
+
+void test("provider stop errors are reported instead of sentinel failures", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel(), editorText: "original draft" });
+  let callCount = 0;
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () => {
+      callCount += 1;
+      return Promise.resolve({
+        ...createAssistantResponse(""),
+        content: [],
+        stopReason: "error" as const,
+        errorMessage: "OpenRouter error: model is unavailable",
+      });
+    })
+  );
+
+  const message = ctx.uiState.notifications.at(-1)?.message ?? "";
+  assert.equal(callCount, 1);
+  assert.equal(ctx.uiState.editorText, "original draft");
+  assert.match(message, /request failed before returning an enhanced prompt/i);
+  assert.match(message, /openrouter error: model is unavailable/i);
+  assert.doesNotMatch(message, /missing sentinel block/i);
 });
 
 void test("hung enhancement times out and leaves the editor unchanged", async () => {
