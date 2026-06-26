@@ -1,4 +1,4 @@
-import { complete } from "@earendil-works/pi-ai";
+import { complete } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { CompleteFn } from "./enhance.js";
 import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "./constants.js";

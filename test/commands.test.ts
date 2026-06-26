@@ -59,7 +59,7 @@ void test("promptsmith command forwards model request headers to the enhancer", 
     editorText: "fix this prompt",
     requestHeaders: new Map([[`${model.provider}/${model.id}`, { "x-promptsmith-test": "1" }]]),
   });
-  let requestOptions: { apiKey?: string; headers?: Record<string, string> } | undefined;
+  let requestOptions: { apiKey?: string; headers?: Record<string, string | null> } | undefined;
 
   await handlePromptsmithCommand(
     "",
