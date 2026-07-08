@@ -272,10 +272,8 @@ async function generateEnhancedPrompt(
       return null;
     }
 
-    const primaryText = extractTextResponse(primaryResponse);
-
     try {
-      return parseEnhancedPrompt(primaryText);
+      return parseEnhancedAssistantResponse(primaryResponse);
     } catch (error) {
       if (!isInvalidModelOutputError(error)) {
         throw error;
@@ -296,10 +294,8 @@ async function generateEnhancedPrompt(
         return null;
       }
 
-      const retryText = extractTextResponse(retryResponse);
-
       try {
-        const parsed = parseEnhancedPrompt(retryText);
+        const parsed = parseEnhancedAssistantResponse(retryResponse);
         tracker.recoveredAfterRetry = true;
         return parsed;
       } catch (retryError) {
@@ -312,9 +308,9 @@ async function generateEnhancedPrompt(
           buildInvalidModelOutputFailureMessage(
             preparation.enhancerModel.label,
             error,
-            primaryText,
+            primaryResponse,
             retryError,
-            retryText
+            retryResponse
           )
         );
       }
@@ -365,6 +361,14 @@ async function runCompletion(
     return null;
   }
 
+  if (response.stopReason === "error") {
+    throw createCompletionStopReasonError(preparation.enhancerModel.label, response);
+  }
+
+  if (response.stopReason === "toolUse") {
+    throw createCompletionStopReasonError(preparation.enhancerModel.label, response);
+  }
+
   return response;
 }
 
@@ -378,6 +382,7 @@ function buildCompletionOptions(
     ...(typeof apiKey === "string" ? { apiKey } : {}),
     ...(headers ? { headers } : {}),
     ...buildGptCompletionOptions(preparation.enhancerModel.model),
+    ...buildProviderCompatibilityOptions(preparation.enhancerModel.model),
     signal: requestSignal,
     maxTokens: Math.min(preparation.enhancerModel.model.maxTokens, ENHANCER_MAX_OUTPUT_TOKENS),
   };
@@ -400,6 +405,62 @@ function isGptModel(model: Model<Api>): boolean {
     id.startsWith("gpt") ||
     /^o[1-9]/.test(id)
   );
+}
+
+function buildProviderCompatibilityOptions(model: Model<Api>): CompleteOptions {
+  if (isOpenRouterMiniMaxModel(model)) {
+    return { onPayload: normalizeOpenRouterMiniMaxPayload };
+  }
+
+  return {};
+}
+
+function isOpenRouterMiniMaxModel(model: Model<Api>): boolean {
+  return (
+    model.provider.toLowerCase() === "openrouter" && model.id.toLowerCase().startsWith("minimax/")
+  );
+}
+
+function normalizeOpenRouterMiniMaxPayload(payload: unknown): unknown {
+  if (!isRecord(payload)) {
+    return undefined;
+  }
+
+  let changed = false;
+  const next: Record<string, unknown> = { ...payload };
+
+  if (Array.isArray(next.messages)) {
+    const rawMessages: unknown[] = next.messages;
+    const messages = rawMessages.map((message) => {
+      if (!isRecord(message) || message.role !== "developer") {
+        return message;
+      }
+
+      changed = true;
+      return { ...message, role: "system" };
+    });
+
+    if (changed) {
+      next.messages = messages;
+    }
+  }
+
+  if (next.max_completion_tokens !== undefined && next.max_tokens === undefined) {
+    next.max_tokens = next.max_completion_tokens;
+    delete next.max_completion_tokens;
+    changed = true;
+  }
+
+  if (next.store === false) {
+    delete next.store;
+    changed = true;
+  }
+
+  return changed ? next : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function buildRetryRequest(request: Context): Context {
@@ -490,6 +551,27 @@ function sendEnhancedPromptIfConfigured(
   }
 }
 
+function createCompletionStopReasonError(
+  enhancerModelLabel: string,
+  response: AssistantMessage
+): Error {
+  if (response.stopReason === "error") {
+    const providerError = response.errorMessage?.trim();
+    return new Error(
+      [
+        `Promptsmith enhancer model ${enhancerModelLabel} request failed before returning an enhanced prompt.`,
+        providerError ? `Provider error: ${providerError}` : "Provider error: no details returned.",
+        `Response preview: ${formatAssistantResponsePreview(response)}`,
+        "Try /promptsmith status to inspect the current enhancer configuration or switch enhancer models.",
+      ].join("\n")
+    );
+  }
+
+  return new Error(
+    `Promptsmith enhancer model ${enhancerModelLabel} stopped with ${response.stopReason} before returning an enhanced prompt.`
+  );
+}
+
 function buildInvalidModelOutputFailureSummary(
   primaryError: PromptsmithInvalidModelOutputError,
   retryError: PromptsmithInvalidModelOutputError
@@ -500,19 +582,33 @@ function buildInvalidModelOutputFailureSummary(
 function buildInvalidModelOutputFailureMessage(
   enhancerModelLabel: string,
   primaryError: PromptsmithInvalidModelOutputError,
-  primaryText: string,
+  primaryResponse: AssistantMessage,
   retryError: PromptsmithInvalidModelOutputError,
-  retryText: string
+  retryResponse: AssistantMessage
 ): string {
   return [
     `Promptsmith enhancer model ${enhancerModelLabel} returned invalid output twice.`,
     `Primary failure: ${describeInvalidModelOutputReason(primaryError.reason)}.`,
     `Retry failure: ${describeInvalidModelOutputReason(retryError.reason)}.`,
     `Expected exactly one sentinel block: ${buildSentinelReminder()}`,
-    `Primary response preview: ${formatModelOutputPreview(primaryText)}`,
-    `Retry response preview: ${formatModelOutputPreview(retryText)}`,
+    `Primary response preview: ${formatAssistantResponsePreview(primaryResponse)}`,
+    `Retry response preview: ${formatAssistantResponsePreview(retryResponse)}`,
     "Try /promptsmith status to inspect the current enhancer configuration or switch to a more format-reliable enhancer model.",
   ].join("\n");
+}
+
+function formatAssistantResponsePreview(response: AssistantMessage): string {
+  const text = extractTextResponse(response);
+  if (text) {
+    return formatModelOutputPreview(text);
+  }
+
+  const thinkingText = extractThinkingResponse(response);
+  if (thinkingText) {
+    return formatEmptyResponsePreview(response, "received thinking-only content");
+  }
+
+  return formatEmptyResponsePreview(response);
 }
 
 function formatModelOutputPreview(text: string, maxLength = 220): string {
@@ -524,6 +620,17 @@ function formatModelOutputPreview(text: string, maxLength = 220): string {
   return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}…`;
 }
 
+function formatEmptyResponsePreview(response: AssistantMessage, note?: string): string {
+  const details = [
+    response.stopReason !== "stop" ? `stop reason: ${response.stopReason}` : "",
+    note,
+  ]
+    .filter(Boolean)
+    .join("; ");
+
+  return details ? `<empty response; ${details}>` : "<empty response>";
+}
+
 async function previewEnhancedPrompt(
   ctx: ExtensionContext,
   enhancedPrompt: string
@@ -531,10 +638,48 @@ async function previewEnhancedPrompt(
   return ctx.ui.editor("Review enhanced prompt", enhancedPrompt);
 }
 
+function parseEnhancedAssistantResponse(response: AssistantMessage): string {
+  const text = extractTextResponse(response);
+
+  try {
+    return parseEnhancedPrompt(text);
+  } catch (error) {
+    if (!shouldTryThinkingFallback(error, text)) {
+      throw error;
+    }
+
+    const thinkingText = extractThinkingResponse(response);
+    if (!thinkingText) {
+      throw error;
+    }
+
+    try {
+      return parseEnhancedPrompt(thinkingText);
+    } catch {
+      throw error;
+    }
+  }
+}
+
+function shouldTryThinkingFallback(error: unknown, text: string): boolean {
+  return !text && isInvalidModelOutputError(error) && error.reason === "missing-sentinel-block";
+}
+
 function extractTextResponse(response: AssistantMessage): string {
   return response.content
     .filter((part): part is { type: "text"; text: string } => part.type === "text")
     .map((part) => part.text)
+    .join("\n")
+    .trim();
+}
+
+function extractThinkingResponse(response: AssistantMessage): string {
+  return response.content
+    .filter(
+      (part): part is { type: "thinking"; thinking: string; redacted?: boolean } =>
+        part.type === "thinking" && part.redacted !== true
+    )
+    .map((part) => part.thinking)
     .join("\n")
     .trim();
 }
