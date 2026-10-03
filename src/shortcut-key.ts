@@ -1,6 +1,6 @@
-import { matchesKey, type KeyId } from "@earendil-works/pi-tui";
+import { type KeyId, matchesKey } from "@earendil-works/pi-tui";
 import { DEFAULT_SHORTCUT_KEY } from "./constants.js";
-import type { PromptsmithSettings } from "./types.js";
+import { type PromptsmithSettings } from "./types.js";
 
 const MODIFIER_ORDER = ["ctrl", "shift", "alt"] as const;
 const MODIFIERS = new Set<string>(MODIFIER_ORDER);

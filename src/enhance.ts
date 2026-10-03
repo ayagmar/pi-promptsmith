@@ -1,18 +1,21 @@
 import { clearTimeout, setTimeout } from "node:timers";
-import type {
-  Api,
-  AssistantMessage,
-  Context,
-  Model,
-  ProviderStreamOptions,
+import {
+  type Api,
+  type AssistantMessage,
+  type Context,
+  type Model,
+  type ProviderStreamOptions,
 } from "@earendil-works/pi-ai";
+import {
+  BorderedLoader,
+  type ExtensionAPI,
+  type ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { ENHANCER_MAX_OUTPUT_TOKENS } from "./constants.js";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { BorderedLoader } from "@earendil-works/pi-coding-agent";
 import { buildPromptContext } from "./context.js";
 import { resolveEditorDraft } from "./editor-draft.js";
-import { resolveEnhancerModel } from "./model-selection.js";
 import { resolveTargetFamily } from "./model-routing.js";
+import { resolveEnhancerModel } from "./model-selection.js";
 import {
   buildSentinelReminder,
   describeInvalidModelOutputReason,
@@ -20,13 +23,13 @@ import {
   type PromptsmithInvalidModelOutputError,
   parseEnhancedPrompt,
 } from "./parser.js";
-import type { PromptsmithRuntimeState } from "./state.js";
+import { type PromptsmithRuntimeState } from "./state.js";
 import { buildClaudeStrategyRequest } from "./strategies/claude.js";
 import { buildGptStrategyRequest } from "./strategies/gpt.js";
-import type {
-  EnhancementPreparation,
-  PromptsmithEnhancementAttempt,
-  PromptsmithSettings,
+import {
+  type EnhancementPreparation,
+  type PromptsmithEnhancementAttempt,
+  type PromptsmithSettings,
 } from "./types.js";
 import {
   detectRuntimeSupport,

@@ -1,17 +1,17 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Api, AssistantMessage, Model } from "@earendil-works/pi-ai";
-import type {
-  ExtensionAPI,
-  ExtensionCommandContext,
-  ExtensionContext,
-  SessionEntry,
+import { type Api, type AssistantMessage, type Model } from "@earendil-works/pi-ai";
+import {
+  type ExtensionAPI,
+  type ExtensionCommandContext,
+  type ExtensionContext,
+  type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
 import { matchesKey } from "@earendil-works/pi-tui";
 import { DEFAULT_SETTINGS, SENTINEL_CLOSE, SENTINEL_OPEN } from "../src/constants.js";
 import { PromptsmithRuntimeState } from "../src/state.js";
-import type { PromptsmithSettings } from "../src/types.js";
+import { type PromptsmithSettings } from "../src/types.js";
 
 export interface MockPiHarness {
   pi: ExtensionAPI;

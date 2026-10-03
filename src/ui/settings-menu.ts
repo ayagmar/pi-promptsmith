@@ -1,6 +1,10 @@
-import type { SelectDialogItem } from "./select-dialog.js";
 import { formatShortcutKey } from "../shortcut-key.js";
-import type { ModelRef, PromptsmithAutoSendBusyBehavior, PromptsmithSettings } from "../types.js";
+import {
+  type ModelRef,
+  type PromptsmithAutoSendBusyBehavior,
+  type PromptsmithSettings,
+} from "../types.js";
+import { type SelectDialogItem } from "./select-dialog.js";
 
 export type SettingsMenuOptionId =
   | "enabled"

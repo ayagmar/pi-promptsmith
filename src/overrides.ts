@@ -1,5 +1,5 @@
 import { normalize } from "./model-routing.js";
-import type { ModelRef, PromptsmithFamily, PromptsmithSettings } from "./types.js";
+import { type ModelRef, type PromptsmithFamily, type PromptsmithSettings } from "./types.js";
 
 export function upsertExactModelOverride(
   settings: PromptsmithSettings,

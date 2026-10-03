@@ -1,5 +1,5 @@
 import { buildSentinelReminder } from "../parser.js";
-import type { PromptsmithContextPayload } from "../types.js";
+import { type PromptsmithContextPayload } from "../types.js";
 
 export function buildSharedSystemPrompt(
   targetStyle: "GPT-style" | "Claude-style",

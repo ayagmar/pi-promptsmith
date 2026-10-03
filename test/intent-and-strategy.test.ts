@@ -1,16 +1,16 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { buildClaudeStrategyRequest } from "../src/strategies/claude.js";
-import { buildGptStrategyRequest } from "../src/strategies/gpt.js";
+import test from "node:test";
 import { buildPromptContext } from "../src/context.js";
 import {
   analyzeDraftIntent,
   detectTaskIntent,
   resolveEffectiveRewriteMode,
 } from "../src/intent.js";
+import { buildClaudeStrategyRequest } from "../src/strategies/claude.js";
+import { buildGptStrategyRequest } from "../src/strategies/gpt.js";
+import { type PromptsmithContextPayload } from "../src/types.js";
 import { buildStatusLine, buildStatusReport, refreshStatusLine } from "../src/ui/status.js";
 import { createCommandContext, createModel, createRuntimeState } from "./helpers.js";
-import type { PromptsmithContextPayload } from "../src/types.js";
 
 void test("intent classification detects implement-oriented drafts", () => {
   assert.equal(

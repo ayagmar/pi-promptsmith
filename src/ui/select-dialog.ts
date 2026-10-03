@@ -1,13 +1,13 @@
-import type { ExtensionContext, KeybindingsManager } from "@earendil-works/pi-coding-agent";
+import { type ExtensionContext, type KeybindingsManager } from "@earendil-works/pi-coding-agent";
 import {
+  type Component,
+  type Focusable,
   fuzzyFilter,
   Input,
+  type SelectItem,
   SelectList,
   truncateToWidth,
   visibleWidth,
-  type Component,
-  type Focusable,
-  type SelectItem,
 } from "@earendil-works/pi-tui";
 import { formatShortcutKey } from "../shortcut-key.js";
 

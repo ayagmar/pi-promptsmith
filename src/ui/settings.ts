@@ -1,13 +1,13 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { PromptsmithRuntimeState } from "../state.js";
+import { type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { type PromptsmithRuntimeState } from "../state.js";
 import { detectRuntimeSupport } from "../validation.js";
+import { openSelectDialog } from "./select-dialog.js";
 import {
+  resetGlobalSettings,
   runSettingsAction,
   type SettingsUiServices,
-  resetGlobalSettings,
 } from "./settings-actions.js";
 import { buildSettingsMenuOptions, type SettingsMenuOptionId } from "./settings-menu.js";
-import { openSelectDialog } from "./select-dialog.js";
 
 export async function openSettingsUi(
   ctx: ExtensionContext,
@@ -38,5 +38,5 @@ export async function openSettingsUi(
   }
 }
 
-export { resetGlobalSettings };
 export type { SettingsUiServices };
+export { resetGlobalSettings };

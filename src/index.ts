@@ -1,12 +1,11 @@
 import { complete } from "@earendil-works/pi-ai/compat";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { CompleteFn } from "./enhance.js";
-import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "./constants.js";
+import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getPromptsmithArgumentCompletions, handlePromptsmithCommand } from "./commands.js";
-import { runEnhancementWithLoader } from "./enhance.js";
+import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "./constants.js";
+import { type CompleteFn, runEnhancementWithLoader } from "./enhance.js";
+import { handlePromptsmithShortcut } from "./shortcut.js";
 import { formatShortcutKey, getCustomShortcutKey } from "./shortcut-key.js";
 import { PromptsmithRuntimeState } from "./state.js";
-import { handlePromptsmithShortcut } from "./shortcut.js";
 import { attachPromptsmithShortcut, createBasePromptsmithEditor } from "./ui/promptsmith-editor.js";
 import { openSettingsUi } from "./ui/settings.js";
 import { refreshStatusLine } from "./ui/status.js";

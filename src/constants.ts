@@ -1,4 +1,4 @@
-import type { PromptsmithSettings } from "./types.js";
+import { type PromptsmithSettings } from "./types.js";
 
 export const EXTENSION_NAME = "pi-promptsmith";
 export const EXTENSION_COMMAND = "promptsmith";

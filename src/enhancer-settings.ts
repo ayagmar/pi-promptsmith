@@ -1,4 +1,4 @@
-import type { ModelRef, PromptsmithFamily, PromptsmithSettings } from "./types.js";
+import { type ModelRef, type PromptsmithFamily, type PromptsmithSettings } from "./types.js";
 
 export function setActiveEnhancerModelMode(settings: PromptsmithSettings): PromptsmithSettings {
   const next = { ...settings, enhancerModelMode: "active" as const };

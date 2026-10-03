@@ -1,6 +1,6 @@
-import type { Api, Model } from "@earendil-works/pi-ai";
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { DEFAULT_SETTINGS } from "../constants.js";
+import { type Api, type Model } from "@earendil-works/pi-ai";
+import { type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { DEFAULT_SETTINGS, DEFAULT_SHORTCUT_KEY } from "../constants.js";
 import {
   clearFamilyEnhancerModel,
   clearFixedEnhancerModel,
@@ -8,22 +8,19 @@ import {
   setFamilyEnhancerModel,
   setFixedEnhancerModel,
 } from "../enhancer-settings.js";
-import { parseModelRef } from "../model-selection.js";
 import { normalize } from "../model-routing.js";
+import { parseModelRef } from "../model-selection.js";
 import {
   removeExactModelOverride,
   removeFamilyOverride,
   upsertExactModelOverride,
   upsertFamilyOverride,
 } from "../overrides.js";
-import { cloneSettings } from "../state.js";
-import type { PromptsmithRuntimeState } from "../state.js";
-import { DEFAULT_SHORTCUT_KEY } from "../constants.js";
 import { formatShortcutKey, isDefaultShortcutConfigured } from "../shortcut-key.js";
-import type { ModelRef, PromptsmithFamily, PromptsmithSettings } from "../types.js";
+import { cloneSettings, type PromptsmithRuntimeState } from "../state.js";
+import { type ModelRef, type PromptsmithFamily, type PromptsmithSettings } from "../types.js";
 import { parseEnhancementTimeoutSeconds } from "../validation.js";
 import { openSelectDialog, type SelectDialogItem } from "./select-dialog.js";
-import { captureShortcutKey } from "./shortcut-capture.js";
 import {
   AUTO_SEND_BUSY_BEHAVIOR_OPTIONS,
   describeSelectedAutoSendBusyBehavior,
@@ -41,9 +38,10 @@ import {
   parseLabeledTargetFamilyMode,
   REWRITE_MODE_OPTIONS,
   REWRITE_STRENGTH_OPTIONS,
-  TARGET_FAMILY_OPTIONS,
   type SettingsMenuOptionId,
+  TARGET_FAMILY_OPTIONS,
 } from "./settings-menu.js";
+import { captureShortcutKey } from "./shortcut-capture.js";
 
 export interface SettingsUiServices {
   refreshStatus: (ctx: ExtensionContext) => void;

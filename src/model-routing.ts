@@ -1,5 +1,5 @@
-import type { Api, Model } from "@earendil-works/pi-ai";
-import type { PromptsmithSettings, ResolvedTargetFamily } from "./types.js";
+import { type Api, type Model } from "@earendil-works/pi-ai";
+import { type PromptsmithSettings, type ResolvedTargetFamily } from "./types.js";
 
 export function resolveTargetFamily(
   settings: PromptsmithSettings,

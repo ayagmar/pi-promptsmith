@@ -1,7 +1,7 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { parseEnhancedPrompt } from "../src/parser.js";
+import test from "node:test";
 import { SENTINEL_CLOSE, SENTINEL_OPEN } from "../src/constants.js";
+import { parseEnhancedPrompt } from "../src/parser.js";
 
 void test("parseEnhancedPrompt extracts the enclosed prompt", () => {
   assert.equal(
