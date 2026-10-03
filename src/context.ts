@@ -1,6 +1,7 @@
 import {
   type Api,
   type AssistantMessage,
+  contentText,
   type Model,
   type UserMessage,
 } from "@earendil-works/pi-ai";
@@ -125,29 +126,11 @@ export function buildRecentConversationExcerpts(
 }
 
 function extractMessageText(message: UserMessage | AssistantMessage): string {
-  if (message.role === "user") {
-    if (typeof message.content === "string") {
-      return normalizeExcerptText(message.content);
-    }
-
-    return normalizeExcerptText(
-      message.content
-        .filter((part): part is { type: "text"; text: string } => part.type === "text")
-        .map((part) => part.text)
-        .join("\n")
-    );
-  }
-
-  if (message.stopReason === "aborted") {
+  if (message.role === "assistant" && message.stopReason === "aborted") {
     return "";
   }
 
-  return normalizeExcerptText(
-    message.content
-      .filter((part): part is { type: "text"; text: string } => part.type === "text")
-      .map((part) => part.text)
-      .join("\n")
-  );
+  return normalizeExcerptText(contentText(message.content));
 }
 
 // System messages (pi 1.0 persists them in the session), tool results, summaries

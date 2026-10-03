@@ -3,6 +3,7 @@ import {
   type Api,
   type AssistantMessage,
   type Context,
+  contentText,
   type Model,
   type ModelsSimpleStreamOptions,
 } from "@earendil-works/pi-ai";
@@ -570,11 +571,7 @@ async function previewEnhancedPrompt(
 }
 
 function extractTextResponse(response: AssistantMessage): string {
-  return response.content
-    .filter((part): part is { type: "text"; text: string } => part.type === "text")
-    .map((part) => part.text)
-    .join("\n")
-    .trim();
+  return contentText(response.content).trim();
 }
 
 function waitForAbort<T>(signal: AbortSignal, value: T): Promise<T> {
