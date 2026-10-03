@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -280,6 +287,39 @@ void test("failed global settings writes do not claim success or corrupt runtime
   });
 
   assert.deepEqual(runtime.getSettings(), previousSettings);
+});
+
+void test("settings writes leave no temp file behind, even when the rename fails", () => {
+  const storageDir = mkdtempSync(join(tmpdir(), "promptsmith-state-"));
+  const settingsPath = join(storageDir, "promptsmith-settings.json");
+  const runtime = new PromptsmithRuntimeState(settingsPath);
+
+  runtime.persistSettings({ ...runtime.getSettings(), enabled: false });
+  assert.deepEqual(readdirSync(storageDir), ["promptsmith-settings.json"]);
+  assert.equal(JSON.parse(readFileSync(settingsPath, "utf8")).enabled, false);
+
+  const blockedPath = join(storageDir, "blocked");
+  mkdirSync(join(blockedPath, "child"), { recursive: true });
+  assert.throws(() => {
+    new PromptsmithRuntimeState(blockedPath).persistSettings(runtime.getSettings());
+  });
+  assert.deepEqual(readdirSync(storageDir).sort(), ["blocked", "promptsmith-settings.json"]);
+});
+
+void test("restoring an unreadable settings file warns and leaves the file alone", () => {
+  const storageDir = mkdtempSync(join(tmpdir(), "promptsmith-state-"));
+  const settingsPath = join(storageDir, "promptsmith-settings.json");
+  const runtime = new PromptsmithRuntimeState(settingsPath);
+
+  assert.equal(runtime.restoreSettings(), undefined);
+
+  writeFileSync(settingsPath, '{ "version": 1, "enabled": false,', "utf8");
+  assert.match(runtime.restoreSettings() ?? "", /could not parse .*promptsmith-settings\.json/);
+  assert.deepEqual(runtime.getSettings(), createRuntimeState().getSettings());
+  assert.equal(readFileSync(settingsPath, "utf8"), '{ "version": 1, "enabled": false,');
+
+  writeFileSync(settingsPath, JSON.stringify({ version: 2 }), "utf8");
+  assert.match(runtime.restoreSettings() ?? "", /expected version 1/);
 });
 
 void test("sanitizeSettings rejects unknown schema versions", () => {
