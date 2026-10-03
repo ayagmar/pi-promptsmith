@@ -69,6 +69,6 @@ export function buildSharedContextSections(context: PromptsmithContextPayload): 
   return sections.join("\n\n");
 }
 
-export function section(name: string, body: string): string {
+function section(name: string, body: string): string {
   return `<${name}>\n${body}\n</${name}>`;
 }

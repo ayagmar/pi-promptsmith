@@ -64,8 +64,6 @@ Supported target families:
 
 ## Rewrite modes
 
-Promptsmith stores its settings globally in `~/.pi/agent/promptsmith-settings.json` (or `$PI_CODING_AGENT_DIR/promptsmith-settings.json` when that variable is set).
-
 ### `auto` (default)
 
 Promptsmith uses deterministic local heuristics to decide whether the draft should become:

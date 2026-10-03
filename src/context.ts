@@ -90,7 +90,7 @@ type ContextMessage = ReturnType<
   ExtensionContext["sessionManager"]["buildSessionProjection"]
 >["messages"][number];
 
-export function buildRecentConversationExcerpts(
+function buildRecentConversationExcerpts(
   messages: readonly ContextMessage[],
   tokenBudget: number
 ): ConversationExcerpt[] {
