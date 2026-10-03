@@ -11,7 +11,7 @@ It supports two output styles:
 
 ## Installation
 
-Requires Pi 1.0 or newer. Use `pi-promptsmith@0.4` with older Pi releases.
+Requires Pi 1.0 or newer. With older Pi releases, install `npm:pi-promptsmith@0.4.0`.
 
 Run it once in Pi without installing:
 
@@ -30,6 +30,8 @@ Or install directly from git:
 ```bash
 pi install git:github.com/ayagmar/pi-promptsmith
 ```
+
+Update it with `pi update npm:pi-promptsmith` or `pi update --extensions`. Since Pi 1.0, a bare `pi update` only updates Pi itself.
 
 ## Quick start
 
