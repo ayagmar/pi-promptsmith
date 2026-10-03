@@ -17,6 +17,8 @@ export const MAX_CONVERSATION_MESSAGES = 4;
 export const DEFAULT_OUTPUT_RESERVE_TOKENS = 1_024;
 export const MAX_OUTPUT_RESERVE_TOKENS = 2_048;
 export const ENHANCER_MAX_OUTPUT_TOKENS = 1_200;
+// Extra output budget for reasoning models that cannot turn thinking off.
+export const ENHANCER_REASONING_HEADROOM_TOKENS = 4_096;
 export const MIN_ENHANCEMENT_TIMEOUT_MS = 5_000;
 export const DEFAULT_ENHANCEMENT_TIMEOUT_MS = 45_000;
 export const MAX_ENHANCEMENT_TIMEOUT_MS = 300_000;
