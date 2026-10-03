@@ -68,25 +68,5 @@
   "packageManager": "pnpm@12.8.1",
   "publishConfig": {
     "access": "public"
-  },
-  "release-it": {
-    "git": {
-      "commitMessage": "chore(release): v${version}",
-      "tagName": "v${version}",
-      "requireCleanWorkingDir": true,
-      "requireUpstream": true
-    },
-    "github": {
-      "release": true
-    },
-    "npm": {
-      "publish": true
-    },
-    "plugins": {
-      "@release-it/conventional-changelog": {
-        "preset": "conventionalcommits",
-        "infile": "CHANGELOG.md"
-      }
-    }
   }
 }
