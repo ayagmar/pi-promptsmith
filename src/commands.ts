@@ -522,7 +522,7 @@ type BooleanSettingKey =
   | "preserveCodeBlocks";
 
 function notify(
-  ctx: { hasUI: boolean; ui: { notify: (message: string, type?: "info" | "error") => void } },
+  ctx: Pick<ExtensionCommandContext, "hasUI" | "mode" | "ui">,
   message: string,
   type: "info" | "error" = "info"
 ): void {
@@ -531,7 +531,8 @@ function notify(
     return;
   }
 
-  const writer = type === "error" ? console.error : console.log;
+  // In json mode stdout carries the JSONL event stream, so keep it clean.
+  const writer = type === "error" || ctx.mode === "json" ? console.error : console.log;
   writer(message);
 }
 

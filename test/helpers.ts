@@ -213,6 +213,7 @@ export function createModel(overrides?: Partial<Model<Api>>): Model<Api> {
 
 export function createCommandContext(options?: {
   hasUI?: boolean;
+  mode?: ExtensionContext["mode"];
   editorText?: string;
   editorResponse?: string;
   nextSelectValue?: string;
@@ -246,8 +247,11 @@ export function createCommandContext(options?: {
   const allModels = options?.allModels ?? [options?.model ?? createModel()];
   let editorComponentFactory = options?.editorComponentFactory;
 
+  const hasUI = options?.hasUI ?? true;
   const ctx = {
-    hasUI: options?.hasUI ?? true,
+    hasUI,
+    mode: options?.mode ?? (hasUI ? "tui" : "print"),
+    isProjectTrusted: () => true,
     cwd: options?.cwd ?? `/tmp/project-${Math.random().toString(36).slice(2)}`,
     model: options?.model,
     sessionManager: {

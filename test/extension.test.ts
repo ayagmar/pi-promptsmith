@@ -52,6 +52,22 @@ void test("custom editor is not reinstalled when the shortcut setting is unchang
   assert.equal(ctx.uiState.editorComponentHistory[0]?.kind, "set");
 });
 
+void test("custom editor is only installed in TUI mode", async () => {
+  const harness = createMockPi();
+  const runtime = createPersistedRuntimeState({ shortcutKey: "ctrl+alt+p" });
+  createPromptsmithExtension(harness.pi, { runtime });
+
+  const ctx = createCommandContext({ mode: "rpc", editorText: "draft" });
+  for (const handler of harness.events.get("session_start") ?? []) {
+    await handler({}, ctx);
+  }
+  for (const handler of harness.events.get("session_shutdown") ?? []) {
+    await handler({}, ctx);
+  }
+
+  assert.equal(ctx.uiState.editorComponentHistory.length, 0);
+});
+
 void test("session shutdown restores an existing custom editor component", async () => {
   const existingFactory = () => ({
     render: () => [],

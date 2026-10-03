@@ -149,6 +149,61 @@ void test("the default enhancer transport calls modelRegistry.streamSimple", asy
   assert.deepEqual(calls, [[model, context, { signal, maxTokens: 10 }]]);
 });
 
+void test("rpc mode reports that editor actions need the TUI instead of opening settings", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ mode: "rpc", model: createModel(), editorText: "" });
+  let completions = 0;
+  const services = createServices(harness, () => {
+    completions += 1;
+    return Promise.resolve(createCompleteResponse("unused"));
+  });
+
+  await handlePromptsmithCommand("", ctx, runtime, services);
+  await handlePromptsmithCommand("settings", ctx, runtime, services);
+
+  const notifications = ctx.uiState.notifications;
+  assert.equal(completions, 0);
+  assert.equal(ctx.uiState.customTitles.length, 0);
+  assert.equal(notifications.length, 2);
+  for (const notification of notifications) {
+    assert.equal(notification.type, "error");
+    assert.match(notification.message, /require pi interactive mode/i);
+  }
+});
+
+void test("json mode keeps command output off stdout", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ hasUI: false, mode: "json", model: createModel() });
+  const stdout: unknown[] = [];
+  const stderr: unknown[] = [];
+  const originalLog = console.log;
+  const originalError = console.error;
+  console.log = (...args: unknown[]) => {
+    stdout.push(args);
+  };
+  console.error = (...args: unknown[]) => {
+    stderr.push(args);
+  };
+
+  try {
+    await handlePromptsmithCommand(
+      "status",
+      ctx,
+      runtime,
+      createServices(harness, () => Promise.resolve(createCompleteResponse("unused")))
+    );
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+
+  assert.equal(stdout.length, 0);
+  assert.equal(stderr.length, 1);
+  assert.match(String((stderr[0] as unknown[])[0]), /active model: openai\/gpt-5/);
+});
+
 void test("empty editor opens settings instead of failing", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
