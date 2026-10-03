@@ -35,10 +35,10 @@ export async function resolveEditorDraft(
     throw new Error(unresolvedPasteMarkerMessage());
   }
 
-  const clipboardText = await readClipboardText(exec);
-  const clipboardCandidates = buildClipboardCandidates(clipboardText);
+  const clipboard = await readClipboardText(exec);
+  const clipboardCandidates = buildClipboardCandidates(clipboard.text);
   if (clipboardCandidates.length === 0) {
-    throw new Error(unresolvedPasteMarkerMessage());
+    throw new Error(unresolvedPasteMarkerMessage(clipboard.failure));
   }
 
   const matchingClipboard = clipboardCandidates.find((candidate) =>
@@ -86,36 +86,25 @@ function normalizeLineEndings(text: string): string {
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 }
 
-async function readClipboardText(exec: ExtensionAPI["exec"]): Promise<string | undefined> {
-  let lastErr: unknown;
-  let lastCommand: ClipboardCommand | undefined;
+// Failures are returned instead of logged: writing to stderr would corrupt
+// pi's TUI frame, which is fullscreen by default since pi 1.0.
+async function readClipboardText(
+  exec: ExtensionAPI["exec"]
+): Promise<{ text?: string; failure?: string }> {
+  let failure: string | undefined;
 
   for (const command of getClipboardReadCommands()) {
     try {
       const result = await exec(command.command, command.args);
       if (result.code === 0) {
-        return result.stdout;
+        return { text: result.stdout };
       }
     } catch (error) {
-      lastErr = error;
-      lastCommand = command;
+      failure = `${command.command}: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
 
-  if (lastErr) {
-    if (lastErr instanceof Error) {
-      console.error(
-        `Promptsmith failed to read the clipboard with ${lastCommand?.command ?? "an unknown command"}: ${lastErr.stack ?? lastErr.message}`
-      );
-    } else {
-      console.error(
-        `Promptsmith failed to read the clipboard with ${lastCommand?.command ?? "an unknown command"}:`,
-        lastErr
-      );
-    }
-  }
-
-  return undefined;
+  return failure ? { failure } : {};
 }
 
 function getClipboardReadCommands(): ClipboardCommand[] {
@@ -161,9 +150,10 @@ function isWslEnvironment(): boolean {
   }
 }
 
-function unresolvedPasteMarkerMessage(): string {
+function unresolvedPasteMarkerMessage(clipboardFailure?: string): string {
   return (
     "Promptsmith found Pi paste markers in the editor, but Pi's extension API only exposed the collapsed marker text. " +
-    "Copy the original text again and retry so Promptsmith can recover it from the clipboard."
+    "Copy the original text again and retry so Promptsmith can recover it from the clipboard." +
+    (clipboardFailure ? ` (Clipboard read failed: ${clipboardFailure})` : "")
   );
 }

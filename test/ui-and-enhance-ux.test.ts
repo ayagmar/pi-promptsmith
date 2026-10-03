@@ -272,7 +272,7 @@ void test("resolveEditorDraft tries the Windows clipboard first on WSL", async (
   }
 });
 
-void test("resolveEditorDraft logs clipboard command failures before giving up", async () => {
+void test("resolveEditorDraft reports clipboard failures without writing to stderr", async () => {
   const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
   const originalConsoleError = console.error;
   const loggedErrors: string[] = [];
@@ -287,11 +287,10 @@ void test("resolveEditorDraft logs clipboard command failures before giving up",
 
     await assert.rejects(
       resolveEditorDraft(ctx, () => Promise.reject(new Error("pbpaste failed"))),
-      /Promptsmith found Pi paste markers/
+      /Promptsmith found Pi paste markers.*Clipboard read failed: pbpaste: pbpaste failed/
     );
 
-    assert.match(loggedErrors.join("\n"), /Promptsmith failed to read the clipboard/i);
-    assert.match(loggedErrors.join("\n"), /pbpaste failed/i);
+    assert.deepEqual(loggedErrors, []);
   } finally {
     console.error = originalConsoleError;
     if (platformDescriptor) {
