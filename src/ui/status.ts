@@ -3,7 +3,11 @@ import { EXTENSION_COMMAND, EXTENSION_NAME, MAX_STATUS_MODEL_ID_LENGTH } from ".
 import { buildEnhancerModeLabel } from "../enhance.js";
 import { analyzeDraftIntent } from "../intent.js";
 import { describeResolvedFamily, resolveTargetFamily } from "../model-routing.js";
-import { formatShortcutKey } from "../shortcut-key.js";
+import {
+  formatShortcutKey,
+  isDefaultShortcutConfigured,
+  isDefaultShortcutReservedByPi,
+} from "../shortcut-key.js";
 import { type PromptsmithRuntimeState } from "../state.js";
 import { type PromptsmithStatusSnapshot } from "../types.js";
 import { detectRuntimeSupport } from "../validation.js";
@@ -86,7 +90,11 @@ export function buildStatusReport(ctx: ExtensionContext, runtime: PromptsmithRun
       : []),
     `enabled: ${settings.enabled}`,
     `shortcut enabled: ${settings.shortcutEnabled}`,
-    `shortcut key: ${formatShortcutKey(settings.shortcutKey)}`,
+    `shortcut key: ${formatShortcutKey(settings.shortcutKey)}${
+      isDefaultShortcutConfigured(settings) && isDefaultShortcutReservedByPi()
+        ? " (used by Pi for previous model on this platform; remap it in /promptsmith settings)"
+        : ""
+    }`,
     `status bar enabled: ${settings.statusBarEnabled}`,
     `include recent conversation: ${settings.includeRecentConversation}`,
     `include project metadata: ${settings.includeProjectMetadata}`,
