@@ -1,5 +1,5 @@
 import { type Api, type Context, type Model } from "@earendil-works/pi-ai";
-import { type ExtensionContext, type ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { type ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export type PromptsmithFamily = "gpt" | "claude";
 export type PromptsmithTargetFamilyMode = "auto" | PromptsmithFamily;
@@ -68,16 +68,10 @@ export interface ResolvedTargetFamily {
   matchedRule?: string;
 }
 
-export type PromptsmithRequestAuth = Pick<
-  Extract<Awaited<ReturnType<ModelRegistry["getApiKeyAndHeaders"]>>, { ok: true }>,
-  "apiKey" | "headers"
->;
-
 export interface ResolvedEnhancerModel {
   mode: PromptsmithEnhancerModelMode;
   family: PromptsmithFamily;
   model: Model<Api>;
-  requestAuth: PromptsmithRequestAuth;
   label: string;
 }
 

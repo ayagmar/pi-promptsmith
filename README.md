@@ -296,7 +296,8 @@ Promptsmith keeps a few important guarantees:
 - only one enhancement runs at a time
 - output must contain exactly one sentinel block
 - invalid model-output failures say whether the model missed the sentinel, emitted multiple blocks, added extra text, or returned an empty block
-- GPT enhancer calls request concise text output where the Pi/OpenAI provider supports verbosity controls
+- enhancer calls go through Pi's model registry, so API keys, OAuth logins, `models.json` headers, custom providers and virtual models work as they do in the main session
+- provider errors (missing credentials, rate limits, outages) are reported directly instead of as output-format failures, and are not retried
 - a bad first model response is retried once with a stricter format reminder before Promptsmith fails closed
 - single collapsed Pi paste markers can be recovered from the clipboard; multi-marker drafts fail closed
 - oversized drafts fail clearly instead of being truncated silently
