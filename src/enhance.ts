@@ -14,7 +14,6 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { ENHANCER_MAX_OUTPUT_TOKENS } from "./constants.js";
 import { buildPromptContext } from "./context.js";
-import { resolveEditorDraft } from "./editor-draft.js";
 import { resolveTargetFamily } from "./model-routing.js";
 import { resolveEnhancerModel } from "./model-selection.js";
 import {
@@ -89,7 +88,8 @@ export async function enhanceEditorDraft(
   const settings = runtime.getSettings();
   ensureEnhancementEnabled(settings);
 
-  const draft = await resolveEditorDraft(ctx, services.exec);
+  // Pi expands paste markers here, as it does when the prompt is submitted.
+  const draft = ctx.ui.getEditorText();
   requireNonEmptyDraft(draft);
 
   if (!runtime.tryStartEnhancement()) {

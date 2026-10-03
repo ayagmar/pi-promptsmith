@@ -305,7 +305,7 @@ Promptsmith keeps a few important guarantees:
 - enhancer calls go through Pi's model registry, so API keys, OAuth logins, `models.json` headers, custom providers and virtual models work as they do in the main session
 - provider errors (missing credentials, rate limits, outages) are reported directly instead of as output-format failures, and are not retried
 - a bad first model response is retried once with a stricter format reminder before Promptsmith fails closed
-- single collapsed Pi paste markers can be recovered from the clipboard; multi-marker drafts fail closed
+- pasted blocks are enhanced in full (Pi expands its paste markers), and a cancelled or failed run puts the draft back with its pasted content
 - oversized drafts fail clearly instead of being truncated silently
 - intent detection is local and deterministic; it does not use a second model call
 

@@ -5,7 +5,6 @@ import { join } from "node:path";
 import test from "node:test";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import { handlePromptsmithCommand } from "../src/commands.js";
-import { resolveEditorDraft } from "../src/editor-draft.js";
 import { PromptsmithRuntimeState } from "../src/state.js";
 import { openSelectDialog } from "../src/ui/select-dialog.js";
 import { runSettingsAction } from "../src/ui/settings-actions.js";
@@ -191,112 +190,6 @@ void test("select dialog truncates long titles to the available width", async ()
 
   assert.ok(renderedLines.length > 0);
   assert.ok(visibleWidth(renderedLines[0] ?? "") <= 12);
-});
-
-void test("resolveEditorDraft rejects multiple paste markers without reading the clipboard", async () => {
-  const ctx = createCommandContext({
-    editorText: "First [paste #1 3 chars]\nSecond [paste #2 3 chars]",
-  });
-
-  let execCalls = 0;
-  await assert.rejects(
-    () =>
-      resolveEditorDraft(ctx, () => {
-        execCalls += 1;
-        return Promise.resolve({ stdout: "abc", stderr: "", code: 0, killed: false });
-      }),
-    /Promptsmith found Pi paste markers/
-  );
-
-  assert.equal(execCalls, 0);
-});
-
-void test("resolveEditorDraft accepts clipboard text that contains marker-shaped text", async () => {
-  const ctx = createCommandContext({ editorText: "Paste here: [paste #1]" });
-
-  const resolved = await resolveEditorDraft(ctx, () =>
-    Promise.resolve({ stdout: "literal [paste #2]", stderr: "", code: 0, killed: false })
-  );
-
-  assert.equal(resolved, "Paste here: literal [paste #2]");
-});
-
-void test("resolveEditorDraft tries the Windows clipboard first on WSL", async () => {
-  const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
-  const originalWslDistro = process.env.WSL_DISTRO_NAME;
-  const originalTermuxVersion = process.env.TERMUX_VERSION;
-  const originalAndroidRoot = process.env.ANDROID_ROOT;
-
-  Object.defineProperty(process, "platform", { value: "linux", configurable: true });
-  process.env.WSL_DISTRO_NAME = "Ubuntu";
-  process.env.TERMUX_VERSION = "1.0.0";
-  delete process.env.ANDROID_ROOT;
-
-  try {
-    const ctx = createCommandContext({ editorText: "Paste here: [paste #1]" });
-    const commands: string[] = [];
-
-    const resolved = await resolveEditorDraft(ctx, (command) => {
-      commands.push(command);
-      if (command === "powershell.exe") {
-        return Promise.resolve({ stdout: "", stderr: "missing", code: 1, killed: false });
-      }
-      if (command === "wl-paste") {
-        return Promise.resolve({ stdout: "clipboard text", stderr: "", code: 0, killed: false });
-      }
-      return Promise.resolve({ stdout: "", stderr: "missing", code: 1, killed: false });
-    });
-
-    assert.equal(resolved, "Paste here: clipboard text");
-    assert.deepEqual(commands.slice(0, 3), ["powershell.exe", "termux-clipboard-get", "wl-paste"]);
-    assert.equal(commands.filter((command) => command === "termux-clipboard-get").length, 1);
-  } finally {
-    if (platformDescriptor) {
-      Object.defineProperty(process, "platform", platformDescriptor);
-    }
-    if (originalWslDistro === undefined) {
-      delete process.env.WSL_DISTRO_NAME;
-    } else {
-      process.env.WSL_DISTRO_NAME = originalWslDistro;
-    }
-    if (originalTermuxVersion === undefined) {
-      delete process.env.TERMUX_VERSION;
-    } else {
-      process.env.TERMUX_VERSION = originalTermuxVersion;
-    }
-    if (originalAndroidRoot === undefined) {
-      delete process.env.ANDROID_ROOT;
-    } else {
-      process.env.ANDROID_ROOT = originalAndroidRoot;
-    }
-  }
-});
-
-void test("resolveEditorDraft reports clipboard failures without writing to stderr", async () => {
-  const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
-  const originalConsoleError = console.error;
-  const loggedErrors: string[] = [];
-
-  Object.defineProperty(process, "platform", { value: "darwin", configurable: true });
-  console.error = (...args: unknown[]) => {
-    loggedErrors.push(args.map((value) => String(value)).join(" "));
-  };
-
-  try {
-    const ctx = createCommandContext({ editorText: "Paste here: [paste #1]" });
-
-    await assert.rejects(
-      resolveEditorDraft(ctx, () => Promise.reject(new Error("pbpaste failed"))),
-      /Promptsmith found Pi paste markers.*Clipboard read failed: pbpaste: pbpaste failed/
-    );
-
-    assert.deepEqual(loggedErrors, []);
-  } finally {
-    console.error = originalConsoleError;
-    if (platformDescriptor) {
-      Object.defineProperty(process, "platform", platformDescriptor);
-    }
-  }
 });
 
 void test("clearing the fixed enhancer model in fixed mode falls back to active mode", async () => {
