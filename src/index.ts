@@ -33,7 +33,7 @@ export function createPromptsmithExtension(
   const clearEditorComponent = (ctx: ExtensionContext): void => {
     installedCustomShortcutKey = undefined;
     activeCustomShortcutKey = undefined;
-    if (!ctx.hasUI || !ownsEditorComponent) {
+    if (!ownsEditorComponent) {
       return;
     }
 
@@ -43,7 +43,7 @@ export function createPromptsmithExtension(
   };
 
   const applyEditorComponent = (ctx: ExtensionContext): void => {
-    if (!ctx.hasUI) {
+    if (ctx.mode !== "tui") {
       return;
     }
 

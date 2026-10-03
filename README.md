@@ -305,9 +305,9 @@ Promptsmith keeps a few important guarantees:
 
 ## Runtime support
 
-- **Interactive TUI:** full support
-- **RPC:** status and non-editor settings commands work, but in-place enhancement is blocked because Pi RPC cannot read the current editor buffer
-- **print/json:** editor-dependent actions are unsupported
+- **Interactive TUI** (`ctx.mode === "tui"`, regular and fullscreen): full support
+- **RPC:** `/promptsmith status` and the quick config commands work. Enhancement, undo and the settings UI report that they need interactive mode, because Pi RPC cannot read the editor buffer or show custom dialogs
+- **print/json:** editor-dependent actions are unsupported. Command messages go to stdout in print mode and to stderr in json mode, so the JSON event stream stays valid
 
 ## Development
 

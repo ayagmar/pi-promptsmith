@@ -311,11 +311,14 @@ void test("sanitizeSettings rejects array-backed objects in record slots", () =>
   assert.equal(sanitized.familyEnhancerModels, undefined);
 });
 
-void test("runtime support relies on hasUI instead of theme enumeration", () => {
-  const interactiveCtx = createCommandContext({ hasUI: true, themeCount: 0 });
-  const headlessCtx = createCommandContext({ hasUI: false, themeCount: 1 });
+void test("runtime support requires the TUI mode instead of hasUI or themes", () => {
+  const interactiveCtx = createCommandContext({ hasUI: true, mode: "tui", themeCount: 0 });
+  const rpcCtx = createCommandContext({ hasUI: true, mode: "rpc", themeCount: 1 });
+  const headlessCtx = createCommandContext({ hasUI: false, mode: "print", themeCount: 1 });
 
   assert.equal(detectRuntimeSupport(interactiveCtx).interactiveTui, true);
+  assert.equal(detectRuntimeSupport(rpcCtx).interactiveTui, false);
+  assert.match(detectRuntimeSupport(rpcCtx).reason ?? "", /interactive mode/i);
   assert.equal(detectRuntimeSupport(headlessCtx).interactiveTui, false);
   assert.match(detectRuntimeSupport(headlessCtx).reason ?? "", /interactive mode/i);
 });

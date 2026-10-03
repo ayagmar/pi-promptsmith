@@ -2,8 +2,12 @@ import { type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { MAX_ENHANCEMENT_TIMEOUT_MS, MIN_ENHANCEMENT_TIMEOUT_MS } from "./constants.js";
 import { type PromptsmithRuntimeSupport, type PromptsmithSettings } from "./types.js";
 
-export function detectRuntimeSupport(ctx: ExtensionContext): PromptsmithRuntimeSupport {
-  if (!ctx.hasUI) {
+export function detectRuntimeSupport(
+  ctx: Pick<ExtensionContext, "mode">
+): PromptsmithRuntimeSupport {
+  // ctx.hasUI is also true in RPC mode, where the editor buffer cannot be read
+  // and ctx.ui.custom() resolves undefined. Only the TUI supports editor actions.
+  if (ctx.mode !== "tui") {
     return {
       interactiveTui: false,
       reason: "Promptsmith editor actions require Pi interactive mode.",
