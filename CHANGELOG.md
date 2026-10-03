@@ -10,16 +10,6 @@
 
 * **promptsmith:** scope Codex request options ([c7b9c3c](https://github.com/ayagmar/pi-promptsmith/commit/c7b9c3c460e99e7651f23b059aa916216eb56a35))
 
-## Unreleased
-
-### Features
-
-* **promptsmith:** align GPT-style rewrites with OpenAI prompt guidance and request concise Codex Responses enhancer output
-
-### Bug Fixes
-
-* **promptsmith:** preserve existing custom editor components when installing the Promptsmith shortcut wrapper
-
 ## [0.3.2](https://github.com/ayagmar/pi-promptsmith/compare/v0.3.1...v0.3.2) (2026-05-11)
 
 ## [0.3.1](https://github.com/ayagmar/pi-promptsmith/compare/v0.3.0...v0.3.1) (2026-03-27)
@@ -57,5 +47,3 @@
 * **promptsmith:** expand pasted drafts and preserve latest settings ([90adb5d](https://github.com/ayagmar/pi-promptsmith/commit/90adb5d46fb6d346177479d1da1e6d6e3446408c))
 * **promptsmith:** normalize exact model override matching ([06d0b55](https://github.com/ayagmar/pi-promptsmith/commit/06d0b55c6df92e2789faa52c5845a8825cdf5686))
 * **promptsmith:** simplify enhancer state and draft recovery ([aff00d2](https://github.com/ayagmar/pi-promptsmith/commit/aff00d2d29f2bf4727fb80ee90d9dd68274e3027))
-
-All notable changes to this project will be documented in this file.

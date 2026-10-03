@@ -11,31 +11,8 @@
     "promptsmith",
     "ai"
   ],
-  "type": "module",
-  "main": "./src/index.ts",
-  "files": [
-    "src/",
-    "README.md",
-    "LICENSE"
-  ],
-  "scripts": {
-    "lint": "biome lint --error-on-warnings .",
-    "lint:fix": "biome check --write .",
-    "format": "biome format --write .",
-    "format:check": "biome format .",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "smoke-test": "node --import=tsx ./scripts/smoke-test.mjs",
-    "test": "node --import=tsx --test ./test/*.test.ts",
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test && pnpm run smoke-test",
-    "release": "release-it",
-    "release:first": "release-it --first-release"
-  },
-  "pi": {
-    "extensions": [
-      "./src/index.ts"
-    ],
-    "image": "https://raw.githubusercontent.com/ayagmar/pi-promptsmith/main/promptsmith.gif"
-  },
+  "license": "MIT",
+  "author": "ayagmar",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ayagmar/pi-promptsmith.git"
@@ -44,27 +21,53 @@
   "bugs": {
     "url": "https://github.com/ayagmar/pi-promptsmith/issues"
   },
+  "type": "module",
+  "main": "./src/index.ts",
+  "files": [
+    "src/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/ayagmar/pi-promptsmith/main/promptsmith.gif"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome lint --error-on-warnings .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "test": "node --import=tsx --test ./test/*.test.ts",
+    "smoke-test": "node --import=tsx ./scripts/smoke-test.mjs",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test && pnpm run smoke-test",
+    "release:dry": "release-it --ci --dry-run"
+  },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
-    "typebox": "*"
+    "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
     "@earendil-works/pi-ai": "^0.80.0",
     "@earendil-works/pi-coding-agent": "^0.80.0",
     "@earendil-works/pi-tui": "^0.80.0",
-    "@release-it/conventional-changelog": "^10.0.5",
-    "@types/node": "^22.19.10",
-    "release-it": "^19.2.4",
+    "@release-it/conventional-changelog": "^12.0.2",
+    "@types/node": "^24",
+    "release-it": "^21.1.0",
     "tsx": "^4.21.0",
-    "typebox": "^1.1.38",
     "typescript": "^5.9.3"
   },
-  "license": "MIT",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.19.0"
+  },
+  "packageManager": "pnpm@12.8.1",
+  "publishConfig": {
+    "access": "public"
   },
   "release-it": {
     "git": {
