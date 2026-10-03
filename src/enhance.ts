@@ -100,6 +100,7 @@ export async function enhanceEditorDraft(
 
   let attempt: PromptsmithEnhancementAttempt | undefined;
   let preparation: EnhancementPreparation | undefined;
+  let editorUpdated = false;
   const tracker: EnhancementAttemptTracker = {
     retryUsed: false,
     recoveredAfterRetry: false,
@@ -150,6 +151,7 @@ export async function enhanceEditorDraft(
     if (!autoSendResult.sent) {
       ctx.ui.setEditorText(finalText);
     }
+    editorUpdated = true;
 
     ctx.ui.notify(buildSuccessMessage(tracker, autoSendResult.sent), "info");
     if (autoSendResult.error) {
@@ -181,6 +183,9 @@ export async function enhanceEditorDraft(
 
     throw error;
   } finally {
+    if (!editorUpdated) {
+      restoreEditorDraft(ctx, draft);
+    }
     if (attempt) {
       runtime.rememberEnhancementAttempt(attempt);
     }
@@ -543,6 +548,18 @@ function formatModelOutputPreview(text: string, maxLength = 220): string {
   }
 
   return normalized.length <= maxLength ? normalized : `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+/**
+ * When the loader closes, pi's ctx.ui.custom() puts the editor's collapsed text
+ * back with setText(), which empties the editor's paste registry: a pasted block
+ * is left behind as literal "[paste #1 +40 lines]" text and its content is gone.
+ * Put the expanded draft back so a cancelled or failed run loses nothing.
+ */
+function restoreEditorDraft(ctx: ExtensionContext, draft: string): void {
+  if (ctx.ui.getEditorText() !== draft) {
+    ctx.ui.setEditorText(draft);
+  }
 }
 
 async function previewEnhancedPrompt(
