@@ -3,17 +3,18 @@ import { type ModelRegistry } from "@earendil-works/pi-coding-agent";
 import {
   type ModelRef,
   type PromptsmithFamily,
-  type PromptsmithRequestAuth,
   type PromptsmithSettings,
   type ResolvedEnhancerModel,
 } from "./types.js";
 
-export async function resolveEnhancerModel(
+// Request auth (API keys, headers, base URLs, OAuth refresh) is resolved by
+// ctx.modelRegistry at request time, so this only picks the model.
+export function resolveEnhancerModel(
   settings: PromptsmithSettings,
   targetFamily: PromptsmithFamily,
   activeModel: Model<Api> | undefined,
-  modelRegistry: ModelRegistry
-): Promise<ResolvedEnhancerModel> {
+  modelRegistry: Pick<ModelRegistry, "find">
+): ResolvedEnhancerModel {
   switch (settings.enhancerModelMode) {
     case "active": {
       if (!activeModel) {
@@ -21,12 +22,10 @@ export async function resolveEnhancerModel(
           "Promptsmith requires an active model when enhancer-model mode is 'active'."
         );
       }
-      const requestAuth = await resolveRequestAuth(modelRegistry, activeModel);
       return {
         mode: "active",
         family: targetFamily,
         model: activeModel,
-        requestAuth,
         label: `active (${activeModel.provider}/${activeModel.id})`,
       };
     }
@@ -76,12 +75,12 @@ export function parseModelRef(value: string): ModelRef | undefined {
   return { provider, id };
 }
 
-async function resolveConfiguredModel(
-  modelRegistry: ModelRegistry,
+function resolveConfiguredModel(
+  modelRegistry: Pick<ModelRegistry, "find">,
   targetFamily: PromptsmithFamily,
   modelRef: ModelRef,
   mode: ResolvedEnhancerModel["mode"]
-): Promise<ResolvedEnhancerModel> {
+): ResolvedEnhancerModel {
   const model = modelRegistry.find(modelRef.provider, modelRef.id);
   if (!model) {
     throw new Error(
@@ -89,29 +88,10 @@ async function resolveConfiguredModel(
     );
   }
 
-  const requestAuth = await resolveRequestAuth(modelRegistry, model);
   return {
     mode,
     family: targetFamily,
     model,
-    requestAuth,
     label: `${model.provider}/${model.id}`,
-  };
-}
-
-async function resolveRequestAuth(
-  modelRegistry: ModelRegistry,
-  model: Model<Api>
-): Promise<PromptsmithRequestAuth> {
-  const auth = await modelRegistry.getApiKeyAndHeaders(model);
-  if (!auth.ok) {
-    throw new Error(
-      `Promptsmith could not resolve request auth for ${model.provider}/${model.id}: ${auth.error}`
-    );
-  }
-
-  return {
-    ...(typeof auth.apiKey === "string" ? { apiKey: auth.apiKey } : {}),
-    ...(auth.headers ? { headers: auth.headers } : {}),
   };
 }

@@ -1,8 +1,11 @@
-import { complete } from "@earendil-works/pi-ai/compat";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getPromptsmithArgumentCompletions, handlePromptsmithCommand } from "./commands.js";
 import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "./constants.js";
-import { type CompleteFn, runEnhancementWithLoader } from "./enhance.js";
+import {
+  type CompleteFn,
+  createModelRegistryCompleteFn,
+  runEnhancementWithLoader,
+} from "./enhance.js";
 import { handlePromptsmithShortcut } from "./shortcut.js";
 import { formatShortcutKey, getCustomShortcutKey } from "./shortcut-key.js";
 import { PromptsmithRuntimeState } from "./state.js";
@@ -23,6 +26,9 @@ export function createPromptsmithExtension(
   let previousEditorFactory: ReturnType<ExtensionContext["ui"]["getEditorComponent"]>;
   let installedCustomShortcutKey: string | undefined;
   let activeCustomShortcutKey: string | undefined;
+
+  const resolveCompleteFn = (ctx: ExtensionContext): CompleteFn =>
+    options?.completeFn ?? createModelRegistryCompleteFn(ctx.modelRegistry);
 
   const clearEditorComponent = (ctx: ExtensionContext): void => {
     installedCustomShortcutKey = undefined;
@@ -75,7 +81,7 @@ export function createPromptsmithExtension(
         () => runtime.getSettings(),
         () => {
           void handlePromptsmithShortcut(ctx, runtime, {
-            completeFn: options?.completeFn ?? complete,
+            completeFn: resolveCompleteFn(ctx),
             exec: pi.exec.bind(pi),
             sendUserMessage: pi.sendUserMessage.bind(pi),
             refreshStatus,
@@ -99,7 +105,7 @@ export function createPromptsmithExtension(
   const triggerDefaultShortcut = async (ctx: ExtensionContext): Promise<void> => {
     const settings = runtime.getSettings();
     const shortcutServices = {
-      completeFn: options?.completeFn ?? complete,
+      completeFn: resolveCompleteFn(ctx),
       exec: pi.exec.bind(pi),
       sendUserMessage: pi.sendUserMessage.bind(pi),
       refreshStatus,
@@ -151,7 +157,7 @@ export function createPromptsmithExtension(
     getArgumentCompletions: getPromptsmithArgumentCompletions,
     handler: async (args, ctx) => {
       await handlePromptsmithCommand(args, ctx, runtime, {
-        completeFn: options?.completeFn ?? complete,
+        completeFn: resolveCompleteFn(ctx),
         exec: pi.exec.bind(pi),
         sendUserMessage: pi.sendUserMessage.bind(pi),
         refreshStatus,

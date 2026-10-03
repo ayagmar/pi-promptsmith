@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { type ModelRegistry } from "@earendil-works/pi-coding-agent";
 import {
   getPromptsmithArgumentCompletions,
   handlePromptsmithCommand,
   parsePromptsmithCommand,
 } from "../src/commands.js";
+import { createModelRegistryCompleteFn } from "../src/enhance.js";
 import { handlePromptsmithShortcut } from "../src/shortcut.js";
 import { openSettingsUi } from "../src/ui/settings.js";
 import {
@@ -49,98 +51,102 @@ void test("promptsmith command enhances the current editor draft", async () => {
   assert.match(ctx.uiState.notifications.map((entry) => entry.message).join("\n"), /enhanced/i);
 });
 
-void test("promptsmith command forwards model request headers to the enhancer", async () => {
+void test("promptsmith command leaves request auth to the model registry", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
   const model = createModel();
-  const ctx = createCommandContext({
-    model,
-    allModels: [model],
-    editorText: "fix this prompt",
-    requestHeaders: new Map([[`${model.provider}/${model.id}`, { "x-promptsmith-test": "1" }]]),
-  });
-  let requestOptions: { apiKey?: string; headers?: Record<string, string | null> } | undefined;
-
-  await handlePromptsmithCommand(
-    "",
-    ctx,
-    runtime,
-    createServices(harness, (_model, _context, options) => {
-      requestOptions = options;
-      return Promise.resolve(createCompleteResponse("Enhanced prompt"));
-    })
-  );
-
-  assert.equal(requestOptions?.apiKey, "test-key");
-  assert.deepEqual(requestOptions?.headers, { "x-promptsmith-test": "1" });
-});
-
-void test("promptsmith command asks Codex Responses enhancer models for concise text", async () => {
-  const runtime = createRuntimeState();
-  const harness = createMockPi();
-  const model = createModel({
-    provider: "openai-codex",
-    id: "gpt-5.5",
-    api: "openai-codex-responses",
-  });
   const ctx = createCommandContext({ model, allModels: [model], editorText: "fix this prompt" });
+  let requestModel: unknown;
   let requestOptions: Record<string, unknown> | undefined;
 
   await handlePromptsmithCommand(
     "",
     ctx,
     runtime,
-    createServices(harness, (_model, _context, options) => {
-      requestOptions = options;
+    createServices(harness, (completionModel, _context, options) => {
+      requestModel = completionModel;
+      requestOptions = options ? { ...options } : undefined;
       return Promise.resolve(createCompleteResponse("Enhanced prompt"));
     })
   );
 
-  assert.equal(requestOptions?.textVerbosity, "low");
+  assert.equal(requestModel, model);
+  assert.ok(requestOptions?.signal instanceof AbortSignal);
+  assert.equal(requestOptions?.maxTokens, 1_200);
+  assert.equal(requestOptions?.apiKey, undefined);
+  assert.equal(requestOptions?.headers, undefined);
 });
 
-void test("promptsmith command does not add Codex-only options to OpenAI Responses enhancers", async () => {
+void test("provider errors are reported without a format retry", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
-  const model = createModel({ provider: "openai", id: "gpt-5.5", api: "openai-responses" });
-  const ctx = createCommandContext({ model, allModels: [model], editorText: "fix this prompt" });
-  let requestOptions: Record<string, unknown> | undefined;
+  const ctx = createCommandContext({ model: createModel(), editorText: "original draft" });
+  let callCount = 0;
 
   await handlePromptsmithCommand(
     "",
     ctx,
     runtime,
-    createServices(harness, (_model, _context, options) => {
-      requestOptions = options;
-      return Promise.resolve(createCompleteResponse("Enhanced prompt"));
+    createServices(harness, () => {
+      callCount += 1;
+      return Promise.resolve({
+        ...createAssistantResponse(""),
+        content: [],
+        stopReason: "error" as const,
+        errorMessage: "Provider is not configured: openai",
+      });
     })
   );
 
-  assert.equal(requestOptions?.textVerbosity, undefined);
+  const message = ctx.uiState.notifications.at(-1)?.message ?? "";
+  assert.equal(callCount, 1);
+  assert.equal(ctx.uiState.editorText, "original draft");
+  assert.match(message, /request failed before returning an enhanced prompt/i);
+  assert.match(message, /provider error: provider is not configured: openai/i);
+  assert.doesNotMatch(message, /missing sentinel block/i);
+  assert.equal(runtime.getLastEnhancementAttempt()?.outcome, "failed");
 });
 
-void test("promptsmith command does not add GPT-only request options to Claude enhancers", async () => {
+void test("invalid output that hits the output limit says so", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
-  const model = createModel({
-    provider: "anthropic",
-    id: "claude-sonnet-4-5",
-    api: "anthropic-messages",
+  const ctx = createCommandContext({ model: createModel(), editorText: "original draft" });
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () =>
+      Promise.resolve({
+        ...createAssistantResponse("<promptsmith-enhanced-prompt>cut off mid"),
+        stopReason: "length" as const,
+      })
+    )
+  );
+
+  const message = ctx.uiState.notifications.at(-1)?.message ?? "";
+  assert.equal(ctx.uiState.editorText, "original draft");
+  assert.match(message, /returned invalid output twice/i);
+  assert.match(message, /1200-token output limit \(stop reason: length\)/i);
+});
+
+void test("the default enhancer transport calls modelRegistry.streamSimple", async () => {
+  const model = createModel();
+  const response = createCompleteResponse("Enhanced prompt");
+  const signal = new AbortController().signal;
+  const calls: unknown[][] = [];
+  const completeFn = createModelRegistryCompleteFn({
+    streamSimple: ((...args: unknown[]) => {
+      calls.push(args);
+      return { result: () => Promise.resolve(response) };
+    }) as unknown as ModelRegistry["streamSimple"],
   });
-  const ctx = createCommandContext({ model, allModels: [model], editorText: "fix this prompt" });
-  let requestOptions: Record<string, unknown> | undefined;
 
-  await handlePromptsmithCommand(
-    "",
-    ctx,
-    runtime,
-    createServices(harness, (_model, _context, options) => {
-      requestOptions = options;
-      return Promise.resolve(createCompleteResponse("Enhanced prompt"));
-    })
-  );
+  const context = { systemPrompt: "system", messages: [] };
+  const result = await completeFn(model, context, { signal, maxTokens: 10 });
 
-  assert.equal(requestOptions?.textVerbosity, undefined);
+  assert.equal(result, response);
+  assert.deepEqual(calls, [[model, context, { signal, maxTokens: 10 }]]);
 });
 
 void test("empty editor opens settings instead of failing", async () => {

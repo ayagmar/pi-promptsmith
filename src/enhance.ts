@@ -4,12 +4,13 @@ import {
   type AssistantMessage,
   type Context,
   type Model,
-  type ProviderStreamOptions,
+  type ModelsSimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import {
   BorderedLoader,
   type ExtensionAPI,
   type ExtensionContext,
+  type ModelRegistry,
 } from "@earendil-works/pi-coding-agent";
 import { ENHANCER_MAX_OUTPUT_TOKENS } from "./constants.js";
 import { buildPromptContext } from "./context.js";
@@ -37,13 +38,24 @@ import {
   requireNonEmptyDraft,
 } from "./validation.js";
 
-export type CompleteOptions = ProviderStreamOptions;
+export type CompleteOptions = ModelsSimpleStreamOptions;
 
 export type CompleteFn = (
   model: Model<Api>,
   context: Context,
   options?: CompleteOptions
 ) => Promise<AssistantMessage>;
+
+/**
+ * Default enhancer transport: pi's model registry resolves auth per request
+ * (API keys, OAuth refresh, models.json headers, base URLs) and routes virtual
+ * models to a physical one. Provider failures resolve with stopReason "error".
+ */
+export function createModelRegistryCompleteFn(
+  modelRegistry: Pick<ModelRegistry, "streamSimple">
+): CompleteFn {
+  return (model, context, options) => modelRegistry.streamSimple(model, context, options).result();
+}
 
 export interface EnhancementServices {
   completeFn: CompleteFn;
@@ -184,7 +196,7 @@ async function prepareEnhancement(
   services: Pick<EnhancementServices, "exec">
 ): Promise<EnhancementPreparation> {
   const resolvedTargetFamily = resolveTargetFamily(settings, ctx.model);
-  const enhancerModel = await resolveEnhancerModel(
+  const enhancerModel = resolveEnhancerModel(
     settings,
     resolvedTargetFamily.family,
     ctx.model,
@@ -317,7 +329,8 @@ async function generateEnhancedPrompt(
             error,
             primaryText,
             retryError,
-            retryText
+            retryText,
+            primaryResponse.stopReason === "length" || retryResponse.stopReason === "length"
           )
         );
       }
@@ -368,6 +381,10 @@ async function runCompletion(
     return null;
   }
 
+  if (response.stopReason === "error") {
+    throw createCompletionStopReasonError(preparation.enhancerModel.label, response);
+  }
+
   return response;
 }
 
@@ -375,34 +392,10 @@ function buildCompletionOptions(
   preparation: EnhancementPreparation,
   requestSignal: AbortSignal
 ): CompleteOptions {
-  const { apiKey, headers } = preparation.enhancerModel.requestAuth;
-
   return {
-    ...(typeof apiKey === "string" ? { apiKey } : {}),
-    ...(headers ? { headers } : {}),
-    ...buildGptCompletionOptions(preparation.enhancerModel.model),
     signal: requestSignal,
     maxTokens: Math.min(preparation.enhancerModel.model.maxTokens, ENHANCER_MAX_OUTPUT_TOKENS),
   };
-}
-
-function buildGptCompletionOptions(model: Model<Api>): CompleteOptions {
-  if (!isGptModel(model)) {
-    return {};
-  }
-
-  return model.api === "openai-codex-responses" ? { textVerbosity: "low" } : {};
-}
-
-function isGptModel(model: Model<Api>): boolean {
-  const provider = model.provider.toLowerCase();
-  const id = model.id.toLowerCase();
-  return (
-    provider === "openai" ||
-    provider === "openai-codex" ||
-    id.startsWith("gpt") ||
-    /^o[1-9]/.test(id)
-  );
 }
 
 function buildRetryRequest(request: Context): Context {
@@ -493,6 +486,20 @@ function sendEnhancedPromptIfConfigured(
   }
 }
 
+function createCompletionStopReasonError(
+  enhancerModelLabel: string,
+  response: AssistantMessage
+): Error {
+  const providerError = response.errorMessage?.trim();
+  return new Error(
+    [
+      `Promptsmith enhancer model ${enhancerModelLabel} request failed before returning an enhanced prompt.`,
+      providerError ? `Provider error: ${providerError}` : "Provider error: no details returned.",
+      "Try /promptsmith status to inspect the current enhancer configuration or switch enhancer models.",
+    ].join("\n")
+  );
+}
+
 function buildInvalidModelOutputFailureSummary(
   primaryError: PromptsmithInvalidModelOutputError,
   retryError: PromptsmithInvalidModelOutputError
@@ -505,12 +512,18 @@ function buildInvalidModelOutputFailureMessage(
   primaryError: PromptsmithInvalidModelOutputError,
   primaryText: string,
   retryError: PromptsmithInvalidModelOutputError,
-  retryText: string
+  retryText: string,
+  hitOutputLimit: boolean
 ): string {
   return [
     `Promptsmith enhancer model ${enhancerModelLabel} returned invalid output twice.`,
     `Primary failure: ${describeInvalidModelOutputReason(primaryError.reason)}.`,
     `Retry failure: ${describeInvalidModelOutputReason(retryError.reason)}.`,
+    ...(hitOutputLimit
+      ? [
+          `The response stopped at the ${ENHANCER_MAX_OUTPUT_TOKENS}-token output limit (stop reason: length).`,
+        ]
+      : []),
     `Expected exactly one sentinel block: ${buildSentinelReminder()}`,
     `Primary response preview: ${formatModelOutputPreview(primaryText)}`,
     `Retry response preview: ${formatModelOutputPreview(retryText)}`,
