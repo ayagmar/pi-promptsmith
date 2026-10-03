@@ -561,6 +561,46 @@ void test("failed enhancement leaves the editor unchanged", async () => {
   assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /bad output/);
 });
 
+// pi's ctx.ui.custom() closes by restoring the editor's collapsed text, which
+// drops the paste registry and leaves the marker behind as literal text.
+const PASTED_DRAFT = "Summarize this log:\nline 1\nline 2\nline 3";
+const COLLAPSED_DRAFT = "Summarize this log:\n[paste #1 +3 lines]";
+
+for (const scenario of [
+  {
+    name: "cancelled",
+    settings: {},
+    result: (): Promise<string | null> => Promise.resolve(null),
+  },
+  {
+    name: "failed",
+    settings: {},
+    result: (): Promise<string | null> => Promise.reject(new Error("bad output")),
+  },
+  {
+    name: "preview-cancelled",
+    settings: { previewBeforeReplace: true },
+    result: (): Promise<string | null> => Promise.resolve("Enhanced prompt"),
+  },
+]) {
+  void test(`${scenario.name} enhancement puts back pasted text the loader collapsed`, async () => {
+    const runtime = createRuntimeState();
+    const harness = createMockPi();
+    const ctx = createCommandContext({ model: createModel(), editorText: PASTED_DRAFT });
+    runtime.replaceSettings({ ...runtime.getSettings(), ...scenario.settings });
+
+    await handlePromptsmithCommand("", ctx, runtime, {
+      ...createServices(harness, () => Promise.resolve(createCompleteResponse("unused"))),
+      runCancellableTask: () => {
+        ctx.uiState.editorText = COLLAPSED_DRAFT;
+        return scenario.result();
+      },
+    });
+
+    assert.equal(ctx.uiState.editorText, PASTED_DRAFT);
+  });
+}
+
 void test("invalid model output errors include model-specific diagnostics", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
