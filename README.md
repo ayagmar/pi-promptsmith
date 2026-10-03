@@ -321,4 +321,15 @@ Load the local extension in Pi:
 pi -e ./src/index.ts
 ```
 
-Maintainer release notes live in [`docs/releasing.md`](./docs/releasing.md).
+## Releasing
+
+Releases are cut from GitHub Actions — never from a laptop.
+
+1. Merge Conventional Commits (`feat:`, `fix:`, `feat!:` …) into `master`.
+2. Run **Actions → Release → Run workflow** (or `gh workflow run release.yml -f increment=auto`).
+   `auto` derives the bump from the commits; pick `patch`/`minor`/`major` to override. Tick `dry_run` to preview.
+3. The workflow runs `pnpm run check`, then release-it bumps `package.json`, updates `CHANGELOG.md`,
+   tags `vX.Y.Z`, pushes and creates the GitHub release, and finally `npm publish` publishes with
+   provenance through npm trusted publishing (OIDC — no npm token stored in the repo).
+
+Preview locally with `pnpm release:dry`.
