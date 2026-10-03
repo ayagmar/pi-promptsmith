@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "../src/constants.js";
 import { createPromptsmithExtension } from "../src/index.js";
+import { isDefaultShortcutReservedByPi } from "../src/shortcut-key.js";
 import { createCommandContext, createMockPi, createPersistedRuntimeState } from "./helpers.js";
 
 void test("extension registers the promptsmith command and shortcut", () => {
@@ -10,11 +11,14 @@ void test("extension registers the promptsmith command and shortcut", () => {
   createPromptsmithExtension(harness.pi);
 
   assert.ok(harness.commands.has(EXTENSION_COMMAND));
-  assert.ok(harness.shortcuts.has(DEFAULT_SHORTCUT_KEY));
+  // On Windows and WSL pi reserves Alt+P for model cycling, so it is not registered.
+  assert.equal(harness.shortcuts.has(DEFAULT_SHORTCUT_KEY), !isDefaultShortcutReservedByPi());
   assert.ok(!("toolName" in harness));
 });
 
-void test("default shortcut does not ignore disabled custom shortcut settings", async () => {
+void test("default shortcut does not ignore disabled custom shortcut settings", {
+  skip: isDefaultShortcutReservedByPi() && "Alt+P is reserved by pi on this platform",
+}, async () => {
   const harness = createMockPi();
   const runtime = createPersistedRuntimeState({
     shortcutKey: "ctrl+alt+p",

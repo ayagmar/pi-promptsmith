@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   findShortcutConflictAction,
   formatShortcutKey,
+  isDefaultShortcutReservedByPi,
   matchesCustomShortcut,
   normalizeShortcutKey,
   validateShortcutKey,
@@ -60,4 +61,12 @@ void test("status report includes the configured shortcut key", () => {
   assert.match(report, /shortcut key: Ctrl\+Alt\+P/);
   assert.equal(formatShortcutKey("ctrl+alt+p"), "Ctrl+Alt+P");
   assert.equal(formatShortcutKey("ctrl++"), "Ctrl++");
+});
+
+void test("pi reserves the default Alt+P shortcut only where it uses Windows keybindings", () => {
+  assert.equal(isDefaultShortcutReservedByPi("win32", {}), true);
+  assert.equal(isDefaultShortcutReservedByPi("linux", { WSL_DISTRO_NAME: "Ubuntu" }), true);
+  assert.equal(isDefaultShortcutReservedByPi("linux", { WSL_INTEROP: "/run/WSL/1_interop" }), true);
+  assert.equal(isDefaultShortcutReservedByPi("linux", {}), false);
+  assert.equal(isDefaultShortcutReservedByPi("darwin", { WSL_DISTRO_NAME: "Ubuntu" }), false);
 });

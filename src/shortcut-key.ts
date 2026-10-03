@@ -194,6 +194,22 @@ export function formatShortcutKey(value: string | undefined): string {
   return fallbackParts ? formatShortcutParts(fallbackParts) : DEFAULT_SHORTCUT_KEY;
 }
 
+/**
+ * Pi 1.0 binds Alt+P to "cycle to previous model" (app.model.cycleBackward) when it
+ * uses Windows keybindings: on Windows and on WSL. That action is reserved, so pi
+ * skips an extension shortcut on the same key and logs a conflict at startup.
+ * Mirrors pi's own `useWindowsKeybindings()`, which it does not export.
+ */
+export function isDefaultShortcutReservedByPi(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  return (
+    platform === "win32" ||
+    (platform === "linux" && Boolean(env.WSL_DISTRO_NAME || env.WSL_INTEROP))
+  );
+}
+
 export function isDefaultShortcutConfigured(settings: PromptsmithSettings): boolean {
   return normalizeShortcutKey(settings.shortcutKey) === DEFAULT_SHORTCUT_KEY;
 }
