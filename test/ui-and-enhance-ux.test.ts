@@ -3,7 +3,13 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { visibleWidth } from "@earendil-works/pi-tui";
+import {
+  type KeybindingsConfig,
+  KeybindingsManager,
+  setKeybindings,
+  TUI_KEYBINDINGS,
+  visibleWidth,
+} from "@earendil-works/pi-tui";
 import { handlePromptsmithCommand } from "../src/commands.js";
 import { PromptsmithRuntimeState } from "../src/state.js";
 import { openSelectDialog } from "../src/ui/select-dialog.js";
@@ -44,34 +50,56 @@ void test("compact model selector paginates and supports / search", async () => 
 });
 
 void test("select dialog help line reflects the active keybindings", async () => {
-  const ctx = createCommandContext({
-    keybindingsConfig: {
-      "tui.select.up": "k",
-      "tui.select.down": "j",
-      "tui.select.pageUp": "u",
-      "tui.select.pageDown": "d",
-      "tui.select.confirm": "space",
-      "tui.select.cancel": ["q", "escape"],
-    },
-  });
+  const keybindingsConfig: KeybindingsConfig = {
+    "tui.select.up": "k",
+    "tui.select.down": "j",
+    "tui.select.pageUp": "u",
+    "tui.select.pageDown": "d",
+    "tui.select.confirm": "space",
+    "tui.select.cancel": ["q", "escape"],
+  };
+  const ctx = createCommandContext({ keybindingsConfig });
+  // Pi registers its keybindings manager globally; key hints read it from there.
+  setKeybindings(new KeybindingsManager(TUI_KEYBINDINGS, keybindingsConfig));
 
-  await openSelectDialog(ctx, {
-    title: "Choose model",
-    items: [
-      { value: "one", label: "one" },
-      { value: "two", label: "two" },
-      { value: "three", label: "three" },
-    ],
-    pageSize: 2,
-    searchable: true,
-  });
+  try {
+    await openSelectDialog(ctx, {
+      title: "Choose model",
+      items: [
+        { value: "one", label: "one" },
+        { value: "two", label: "two" },
+        { value: "three", label: "three" },
+      ],
+      pageSize: 2,
+      searchable: true,
+    });
+  } finally {
+    setKeybindings(new KeybindingsManager(TUI_KEYBINDINGS));
+  }
 
   const helpLine = ctx.uiState.customRenderHistory[0]?.at(-1) ?? "";
-  assert.match(helpLine, /K\/J move/);
-  assert.match(helpLine, /U\/D pages/);
-  assert.match(helpLine, /\/ search/);
-  assert.match(helpLine, /Space select/);
-  assert.match(helpLine, /Q\/Esc cancel/);
+  assert.equal(helpLine, "  k/j move · u/d pages · / search · space select · q/escape cancel");
+});
+
+void test("select dialog help line names keys pi binds outside the old key tables", async () => {
+  const ctx = createCommandContext();
+  setKeybindings(
+    new KeybindingsManager(TUI_KEYBINDINGS, {
+      "tui.select.confirm": "super+enter",
+      "tui.select.cancel": "f10",
+    })
+  );
+
+  try {
+    await openSelectDialog(ctx, { title: "Pick", items: [{ value: "one", label: "one" }] });
+  } finally {
+    setKeybindings(new KeybindingsManager(TUI_KEYBINDINGS));
+  }
+
+  const helpLine = ctx.uiState.customRenderHistory[0]?.at(-1) ?? "";
+  assert.match(helpLine, /super\+enter select/);
+  assert.match(helpLine, /f10 cancel/);
+  assert.doesNotMatch(helpLine, /Alt\+P/);
 });
 
 void test("selector navigation wraps from top to bottom", async () => {
