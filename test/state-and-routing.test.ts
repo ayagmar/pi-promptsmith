@@ -51,6 +51,38 @@ void test("target family resolution falls back to built-in defaults and fallback
   );
 });
 
+void test("built-in routing recognizes gateway and Bedrock model ids", () => {
+  const settings = { ...createRuntimeState().getSettings(), fallbackFamily: "gpt" as const };
+  const claudeModels = [
+    { provider: "openrouter", id: "anthropic/claude-haiku-4.5" },
+    { provider: "vercel-ai-gateway", id: "anthropic/claude-3-haiku" },
+    { provider: "amazon-bedrock", id: "anthropic.claude-haiku-4-5-20251001-v1:0" },
+    { provider: "amazon-bedrock", id: "us.anthropic.claude-haiku-4-5-20251001-v1:0" },
+    { provider: "nvidia", id: "moonshotai/kimi-k2.6" },
+    { provider: "cloudflare-workers-ai", id: "@cf/moonshotai/kimi-k2.6" },
+    { provider: "fireworks", id: "accounts/fireworks/models/kimi-k3" },
+  ];
+  for (const model of claudeModels) {
+    const resolved = resolveTargetFamily(settings, createModel(model));
+    assert.deepEqual([model.id, resolved.family, resolved.source], [model.id, "claude", "builtin"]);
+  }
+
+  const fallbackClaude = { ...settings, fallbackFamily: "claude" as const };
+  for (const id of ["openai/gpt-5", "openai/o3"]) {
+    const resolved = resolveTargetFamily(
+      fallbackClaude,
+      createModel({ provider: "openrouter", id })
+    );
+    assert.deepEqual([id, resolved.family, resolved.source], [id, "gpt", "builtin"]);
+  }
+
+  const unknown = resolveTargetFamily(
+    settings,
+    createModel({ provider: "openrouter", id: "mistralai/mistral-large" })
+  );
+  assert.equal(unknown.source, "fallback");
+});
+
 void test("upsertExactModelOverride replaces case-variant duplicates", () => {
   const next = upsertExactModelOverride(
     {
