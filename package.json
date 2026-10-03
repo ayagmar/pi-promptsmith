@@ -33,7 +33,7 @@
     "extensions": [
       "./src/index.ts"
     ],
-    "image": "https://raw.githubusercontent.com/ayagmar/pi-promptsmith/main/promptsmith.gif"
+    "image": "https://raw.githubusercontent.com/ayagmar/pi-promptsmith/master/promptsmith.gif"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
