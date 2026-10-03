@@ -218,6 +218,76 @@ void test("clearing the fixed enhancer model in fixed mode falls back to active 
   assert.equal(runtime.getSettings().fixedEnhancerModel, undefined);
 });
 
+void test("choosing family enhancer models in the settings ui keeps each pick", async () => {
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    enhancerModelMode: "fixed",
+    fixedEnhancerModel: { provider: "openai", id: "gpt-5-mini" },
+  });
+
+  const ctx = createCommandContext();
+  const selections = ["openai/gpt-5", "anthropic/claude-sonnet-4"];
+  Object.assign(ctx.ui, {
+    custom: (_factory: unknown) => Promise.resolve(selections.shift()),
+  });
+  const services = { refreshStatus: () => undefined };
+
+  await runSettingsAction("gptEnhancerModel", { ctx, runtime, services });
+
+  assert.equal(runtime.getSettings().enhancerModelMode, "fixed");
+  assert.deepEqual(runtime.getSettings().fixedEnhancerModel, {
+    provider: "openai",
+    id: "gpt-5-mini",
+  });
+  assert.deepEqual(runtime.getSettings().familyEnhancerModels, {
+    gpt: { provider: "openai", id: "gpt-5" },
+  });
+  assert.match(
+    ctx.uiState.notifications.at(-1)?.message ?? "",
+    /GPT-style enhancer model set to openai\/gpt-5\. Choose a Claude-style model too/
+  );
+
+  await runSettingsAction("claudeEnhancerModel", { ctx, runtime, services });
+
+  assert.equal(runtime.getSettings().enhancerModelMode, "family-linked");
+  assert.equal(runtime.getSettings().fixedEnhancerModel, undefined);
+  assert.deepEqual(runtime.getSettings().familyEnhancerModels, {
+    gpt: { provider: "openai", id: "gpt-5" },
+    claude: { provider: "anthropic", id: "claude-sonnet-4" },
+  });
+  assert.equal(
+    ctx.uiState.notifications.at(-1)?.message,
+    "Claude-style enhancer model set to anthropic/claude-sonnet-4."
+  );
+});
+
+void test("clearing one family enhancer model keeps the other", async () => {
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    enhancerModelMode: "family-linked",
+    familyEnhancerModels: {
+      gpt: { provider: "openai", id: "gpt-5" },
+      claude: { provider: "anthropic", id: "claude-sonnet-4" },
+    },
+  });
+
+  const ctx = createCommandContext();
+  Object.assign(ctx.ui, { custom: (_factory: unknown) => Promise.resolve("Clear") });
+
+  await runSettingsAction("gptEnhancerModel", {
+    ctx,
+    runtime,
+    services: { refreshStatus: () => undefined },
+  });
+
+  assert.equal(runtime.getSettings().enhancerModelMode, "active");
+  assert.deepEqual(runtime.getSettings().familyEnhancerModels, {
+    claude: { provider: "anthropic", id: "claude-sonnet-4" },
+  });
+});
+
 void test("exact override manual routing picker omits the Clear option", async () => {
   const runtime = createRuntimeState();
   const ctx = createCommandContext({ model: createModel() });

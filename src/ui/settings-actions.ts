@@ -228,7 +228,7 @@ export async function runSettingsAction(
           runtime,
           services,
           (latest) => setFamilyEnhancerModel(latest, "gpt", modelRef),
-          `GPT-style enhancer model set to ${modelRef.provider}/${modelRef.id}.`
+          (next) => describeFamilyModelChange("gpt", modelRef, next)
         );
       }
       return;
@@ -255,7 +255,7 @@ export async function runSettingsAction(
           runtime,
           services,
           (latest) => setFamilyEnhancerModel(latest, "claude", modelRef),
-          `Claude-style enhancer model set to ${modelRef.provider}/${modelRef.id}.`
+          (next) => describeFamilyModelChange("claude", modelRef, next)
         );
       }
       return;
@@ -691,6 +691,29 @@ function buildModelDescription(ctx: ExtensionContext, model: Model<Api>): string
     tags.push(`${Math.floor(model.contextWindow / 1_000)}k ctx`);
   }
   return tags.length > 0 ? tags.join(" · ") : undefined;
+}
+
+const FAMILY_STYLE_LABELS: Record<PromptsmithFamily, string> = {
+  gpt: "GPT-style",
+  claude: "Claude-style",
+};
+
+function describeFamilyModelChange(
+  family: PromptsmithFamily,
+  modelRef: ModelRef,
+  next: PromptsmithSettings
+): string {
+  const otherFamily: PromptsmithFamily = family === "gpt" ? "claude" : "gpt";
+  const message = `${FAMILY_STYLE_LABELS[family]} enhancer model set to ${modelRef.provider}/${modelRef.id}.`;
+  if (next.familyEnhancerModels?.[otherFamily]) {
+    return message;
+  }
+
+  const hint =
+    next.enhancerModelMode === "family-linked"
+      ? "family-linked mode needs both."
+      : "enhancer model choice then switches to family-linked.";
+  return `${message} Choose a ${FAMILY_STYLE_LABELS[otherFamily]} model too; ${hint}`;
 }
 
 function formatModel(model: Model<Api>): string {
