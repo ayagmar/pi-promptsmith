@@ -1,6 +1,6 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { MAX_ENHANCEMENT_TIMEOUT_MS, MIN_ENHANCEMENT_TIMEOUT_MS } from "./constants.js";
-import type { PromptsmithRuntimeSupport, PromptsmithSettings } from "./types.js";
+import { type PromptsmithRuntimeSupport, type PromptsmithSettings } from "./types.js";
 
 export function detectRuntimeSupport(ctx: ExtensionContext): PromptsmithRuntimeSupport {
   if (!ctx.hasUI) {

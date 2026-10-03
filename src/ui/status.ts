@@ -1,11 +1,11 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { EXTENSION_COMMAND, EXTENSION_NAME, MAX_STATUS_MODEL_ID_LENGTH } from "../constants.js";
-import { formatShortcutKey } from "../shortcut-key.js";
 import { buildEnhancerModeLabel } from "../enhance.js";
 import { analyzeDraftIntent } from "../intent.js";
 import { describeResolvedFamily, resolveTargetFamily } from "../model-routing.js";
-import type { PromptsmithRuntimeState } from "../state.js";
-import type { PromptsmithStatusSnapshot } from "../types.js";
+import { formatShortcutKey } from "../shortcut-key.js";
+import { type PromptsmithRuntimeState } from "../state.js";
+import { type PromptsmithStatusSnapshot } from "../types.js";
 import { detectRuntimeSupport } from "../validation.js";
 
 export function refreshStatusLine(ctx: ExtensionContext, runtime: PromptsmithRuntimeState): void {

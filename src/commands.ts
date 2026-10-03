@@ -1,23 +1,23 @@
-import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { HELP_LINES } from "./constants.js";
+import { type EnhancementServices, enhanceEditorDraft } from "./enhance.js";
 import {
   setActiveEnhancerModelMode,
   setFamilyEnhancerModel,
   setFixedEnhancerModel,
 } from "./enhancer-settings.js";
-import { enhanceEditorDraft, type EnhancementServices } from "./enhance.js";
 import { parseModelRef } from "./model-selection.js";
 import {
   removeFamilyOverride,
   upsertExactModelOverride,
   upsertFamilyOverride,
 } from "./overrides.js";
-import type { PromptsmithRuntimeState } from "./state.js";
-import type {
-  ParsedPromptsmithCommand,
-  PromptsmithFamily,
-  PromptsmithRewriteMode,
-  PromptsmithSettings,
+import { type PromptsmithRuntimeState } from "./state.js";
+import {
+  type ParsedPromptsmithCommand,
+  type PromptsmithFamily,
+  type PromptsmithRewriteMode,
+  type PromptsmithSettings,
 } from "./types.js";
 import { openSettingsUi, resetGlobalSettings } from "./ui/settings.js";
 import { buildStatusReport } from "./ui/status.js";
@@ -154,7 +154,6 @@ export async function handlePromptsmithCommand(
       case "timeout":
         handleTimeoutCommand(command, ctx, runtime, services);
         return;
-      case "help":
       default:
         notify(ctx, HELP_LINES);
         return;

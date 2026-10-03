@@ -1,7 +1,7 @@
-import type { Context, Message } from "@earendil-works/pi-ai";
+import { type Context, type Message } from "@earendil-works/pi-ai";
 import { buildStrategyInstructions } from "../contracts.js";
+import { type PromptsmithContextPayload } from "../types.js";
 import { buildSharedContextSections, buildSharedSystemPrompt } from "./shared.js";
-import type { PromptsmithContextPayload } from "../types.js";
 
 export function buildClaudeStrategyRequest(context: PromptsmithContextPayload): Context {
   const userMessage: Message = {

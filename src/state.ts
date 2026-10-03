@@ -7,16 +7,16 @@ import {
   MAX_ENHANCEMENT_TIMEOUT_MS,
   MIN_ENHANCEMENT_TIMEOUT_MS,
 } from "./constants.js";
-import { validateShortcutKey } from "./shortcut-key.js";
 import { normalize } from "./model-routing.js";
-import type {
-  ExactModelOverride,
-  FamilyEnhancerModels,
-  FamilyOverride,
-  ModelRef,
-  PromptsmithDraftResolution,
-  PromptsmithEnhancementAttempt,
-  PromptsmithSettings,
+import { validateShortcutKey } from "./shortcut-key.js";
+import {
+  type ExactModelOverride,
+  type FamilyEnhancerModels,
+  type FamilyOverride,
+  type ModelRef,
+  type PromptsmithDraftResolution,
+  type PromptsmithEnhancementAttempt,
+  type PromptsmithSettings,
 } from "./types.js";
 import { UndoManager } from "./undo.js";
 
@@ -212,8 +212,7 @@ function dedupeExactOverrides(overrides: ExactModelOverride[]): ExactModelOverri
   const seen = new Set<string>();
   const deduped: ExactModelOverride[] = [];
 
-  for (let index = overrides.length - 1; index >= 0; index -= 1) {
-    const entry = overrides[index]!;
+  for (const entry of [...overrides].reverse()) {
     const key = `${normalize(entry.provider)}/${normalize(entry.id)}`;
     if (seen.has(key)) {
       continue;
@@ -229,8 +228,7 @@ function dedupeFamilyOverrides(overrides: FamilyOverride[]): FamilyOverride[] {
   const seen = new Set<string>();
   const deduped: FamilyOverride[] = [];
 
-  for (let index = overrides.length - 1; index >= 0; index -= 1) {
-    const entry = overrides[index]!;
+  for (const entry of [...overrides].reverse()) {
     const key = normalize(entry.pattern);
     if (seen.has(key)) {
       continue;

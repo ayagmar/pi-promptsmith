@@ -1,7 +1,7 @@
-import type {
-  PromptsmithEffectiveRewriteMode,
-  PromptsmithRewriteMode,
-  PromptsmithTaskIntent,
+import {
+  type PromptsmithEffectiveRewriteMode,
+  type PromptsmithRewriteMode,
+  type PromptsmithTaskIntent,
 } from "./types.js";
 
 export interface IntentMatchRule {

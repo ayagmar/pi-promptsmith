@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 interface PasteMarker {
   raw: string;
@@ -27,11 +27,11 @@ export async function resolveEditorDraft(
   exec: ExtensionAPI["exec"]
 ): Promise<string> {
   const draft = ctx.ui.getEditorText();
-  const markers = extractPasteMarkers(draft);
-  if (markers.length === 0) {
+  const [marker, ...extraMarkers] = extractPasteMarkers(draft);
+  if (!marker) {
     return draft;
   }
-  if (markers.length > 1) {
+  if (extraMarkers.length > 0) {
     throw new Error(unresolvedPasteMarkerMessage());
   }
 
@@ -41,7 +41,6 @@ export async function resolveEditorDraft(
     throw new Error(unresolvedPasteMarkerMessage());
   }
 
-  const marker = markers[0]!;
   const matchingClipboard = clipboardCandidates.find((candidate) =>
     matchesPasteMarker(candidate, marker)
   );

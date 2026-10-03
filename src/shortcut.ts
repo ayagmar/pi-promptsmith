@@ -1,8 +1,7 @@
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { EnhancementServices } from "./enhance.js";
-import { enhanceEditorDraft } from "./enhance.js";
+import { type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { type EnhancementServices, enhanceEditorDraft } from "./enhance.js";
+import { type PromptsmithRuntimeState } from "./state.js";
 import { detectRuntimeSupport } from "./validation.js";
-import type { PromptsmithRuntimeState } from "./state.js";
 
 interface ShortcutServices extends EnhancementServices {
   openSettings: (ctx: ExtensionContext) => Promise<void>;

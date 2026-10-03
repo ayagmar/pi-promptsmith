@@ -1,11 +1,11 @@
-import type { Api, Model } from "@earendil-works/pi-ai";
-import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import type {
-  ModelRef,
-  PromptsmithFamily,
-  PromptsmithRequestAuth,
-  PromptsmithSettings,
-  ResolvedEnhancerModel,
+import { type Api, type Model } from "@earendil-works/pi-ai";
+import { type ModelRegistry } from "@earendil-works/pi-coding-agent";
+import {
+  type ModelRef,
+  type PromptsmithFamily,
+  type PromptsmithRequestAuth,
+  type PromptsmithSettings,
+  type ResolvedEnhancerModel,
 } from "./types.js";
 
 export async function resolveEnhancerModel(

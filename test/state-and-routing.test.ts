@@ -1,11 +1,11 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import test from "node:test";
 import { setFamilyEnhancerModel } from "../src/enhancer-settings.js";
-import { resolveEnhancerModel } from "../src/model-selection.js";
 import { matchesPattern, resolveTargetFamily } from "../src/model-routing.js";
+import { resolveEnhancerModel } from "../src/model-selection.js";
 import {
   removeExactModelOverride,
   removeFamilyOverride,

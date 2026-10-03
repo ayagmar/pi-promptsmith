@@ -1,7 +1,7 @@
-import type { Context, Message } from "@earendil-works/pi-ai";
+import { type Context, type Message } from "@earendil-works/pi-ai";
 import { buildStrategyInstructions } from "../contracts.js";
+import { type PromptsmithContextPayload } from "../types.js";
 import { buildSharedContextSections, buildSharedSystemPrompt } from "./shared.js";
-import type { PromptsmithContextPayload } from "../types.js";
 
 const GPT_SYSTEM_GUIDANCE = [
   "For GPT-target rewrites, apply OpenAI prompt guidance: make the generated prompt outcome-first, compact, explicit about success criteria, and only as structured as the task needs.",
