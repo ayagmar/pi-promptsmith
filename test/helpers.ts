@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Api, type AssistantMessage, type Model } from "@earendil-works/pi-ai";
 import {
+  buildSessionProjection,
   type ExtensionAPI,
   type ExtensionCommandContext,
   type ExtensionContext,
@@ -256,6 +257,7 @@ export function createCommandContext(options?: {
     model: options?.model,
     sessionManager: {
       getBranch: () => options?.entries ?? [],
+      buildSessionProjection: () => buildSessionProjection(linkEntries(options?.entries ?? [])),
       getSessionFile: () => "/tmp/session.jsonl",
     },
     modelRegistry: {
@@ -481,6 +483,15 @@ export function createRunTaskStub(result: string | null) {
     }
     return task(new AbortController().signal);
   };
+}
+
+// Test entries are created without parents; chain them into one branch.
+function linkEntries(entries: SessionEntry[]): SessionEntry[] {
+  return entries.map((entry, index) =>
+    index > 0 && entry.parentId === null
+      ? { ...entry, parentId: entries[index - 1]?.id ?? null }
+      : entry
+  );
 }
 
 export function createUserEntry(text: string): SessionEntry {

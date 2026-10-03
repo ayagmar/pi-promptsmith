@@ -239,7 +239,7 @@ By default, Promptsmith is fairly lightweight. It always uses:
 
 Optional context:
 
-- **Recent conversation** — recent chat history from the current session branch
+- **Recent conversation** — recent user and assistant messages from the current session branch, as the model sees them: compacted turns and content removed or replaced by context edits are left out
 - **Project metadata** — current working directory and git branch, if available
 
 It does **not** automatically read your repository files, `AGENTS.md`, or README by default.

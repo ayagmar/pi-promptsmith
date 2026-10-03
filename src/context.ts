@@ -4,7 +4,7 @@ import {
   type Model,
   type UserMessage,
 } from "@earendil-works/pi-ai";
-import { type SessionEntry } from "@earendil-works/pi-coding-agent";
+import { type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   DEFAULT_OUTPUT_RESERVE_TOKENS,
   ESTIMATED_FIXED_PROMPT_OVERHEAD_TOKENS,
@@ -52,11 +52,15 @@ export async function buildPromptContext(
   }
 
   let recentConversation: ConversationExcerpt[] = [];
-  const branchEntries = settings.includeRecentConversation ? ctx.sessionManager.getBranch() : [];
-  const hasConversationHistory = hasConversationMessages(branchEntries);
+  // The projection is what the model sees on this branch: it applies compaction
+  // and context edits, so omitted or replaced content never reaches the enhancer.
+  const contextMessages = settings.includeRecentConversation
+    ? ctx.sessionManager.buildSessionProjection().messages
+    : [];
+  const hasConversationHistory = hasConversationMessages(contextMessages);
   if (settings.includeRecentConversation && remainingOptionalBudget > 0) {
     recentConversation = buildRecentConversationExcerpts(
-      branchEntries,
+      contextMessages,
       Math.min(MAX_RECENT_CONVERSATION_TOKENS, remainingOptionalBudget)
     );
     if (recentConversation.length === 0 && hasConversationHistory) {
@@ -81,19 +85,20 @@ export async function buildPromptContext(
   };
 }
 
+type ContextMessage = ReturnType<
+  ExtensionContext["sessionManager"]["buildSessionProjection"]
+>["messages"][number];
+
 export function buildRecentConversationExcerpts(
-  entries: SessionEntry[],
+  messages: readonly ContextMessage[],
   tokenBudget: number
 ): ConversationExcerpt[] {
   const selected: ConversationExcerpt[] = [];
   let remainingBudget = tokenBudget;
 
-  for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = entries[index];
-    if (entry?.type !== "message") continue;
-
-    const message = entry.message;
-    if (!isConversationMessage(message)) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || !isConversationMessage(message)) {
       continue;
     }
 
@@ -145,18 +150,14 @@ function extractMessageText(message: UserMessage | AssistantMessage): string {
   );
 }
 
-type SessionMessage = Extract<SessionEntry, { type: "message" }>["message"];
-
-function isConversationMessage(message: SessionMessage): message is UserMessage | AssistantMessage {
+// System messages (pi 1.0 persists them in the session), tool results, summaries
+// and custom messages are not part of the user/assistant exchange.
+function isConversationMessage(message: ContextMessage): message is UserMessage | AssistantMessage {
   return message.role === "user" || message.role === "assistant";
 }
 
-function hasConversationMessages(entries: SessionEntry[]): boolean {
-  return entries.some(
-    (entry) =>
-      entry?.type === "message" &&
-      (entry.message.role === "user" || entry.message.role === "assistant")
-  );
+function hasConversationMessages(messages: readonly ContextMessage[]): boolean {
+  return messages.some(isConversationMessage);
 }
 
 async function buildProjectMetadata(
