@@ -60,7 +60,7 @@ Supported target families:
 
 ## Rewrite modes
 
-Promptsmith stores its settings globally in `~/.pi/agent/promptsmith-settings.json`.
+Promptsmith stores its settings globally in `~/.pi/agent/promptsmith-settings.json` (or `$PI_CODING_AGENT_DIR/promptsmith-settings.json` when that variable is set).
 
 ### `auto` (default)
 
@@ -213,6 +213,8 @@ Promptsmith saves global settings in:
 ```text
 ~/.pi/agent/promptsmith-settings.json
 ```
+
+That is Pi's agent directory, so `PI_CODING_AGENT_DIR` moves it along with the rest of Pi's config.
 
 Important defaults:
 

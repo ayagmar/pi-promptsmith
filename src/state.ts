@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
   DEFAULT_ENHANCEMENT_TIMEOUT_MS,
   DEFAULT_SETTINGS,
@@ -93,8 +93,9 @@ export class PromptsmithRuntimeState {
   }
 }
 
-function getGlobalSettingsPath(): string {
-  return join(homedir(), ".pi", "agent", "promptsmith-settings.json");
+// getAgentDir() honors PI_CODING_AGENT_DIR; it is ~/.pi/agent by default.
+export function getGlobalSettingsPath(): string {
+  return join(getAgentDir(), "promptsmith-settings.json");
 }
 
 function restoreSettingsFromDisk(path: string): PromptsmithSettings | undefined {
