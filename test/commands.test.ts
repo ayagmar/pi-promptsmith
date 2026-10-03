@@ -73,6 +73,7 @@ void test("promptsmith command leaves request auth to the model registry", async
   assert.equal(requestModel, model);
   assert.ok(requestOptions?.signal instanceof AbortSignal);
   assert.equal(requestOptions?.maxTokens, 1_200);
+  assert.equal(requestOptions?.reasoning, undefined);
   assert.equal(requestOptions?.apiKey, undefined);
   assert.equal(requestOptions?.headers, undefined);
 });
@@ -103,6 +104,38 @@ void test("virtual enhancer models without declared limits can enhance drafts", 
 
   assert.equal(ctx.uiState.editorText, "Enhanced prompt");
   assert.equal(requestOptions?.maxTokens, 1_200);
+});
+
+void test("models that cannot turn thinking off get their lowest level and room to reason", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const model = createModel({
+    provider: "github-copilot",
+    id: "gpt-5.5",
+    thinkingLevelMap: { off: null, minimal: null },
+  });
+  const ctx = createCommandContext({ model, allModels: [model], editorText: "fix this prompt" });
+  const requests: Record<string, unknown>[] = [];
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, (_model, _context, options) => {
+      requests.push({ ...options });
+      return Promise.resolve({
+        ...createAssistantResponse(""),
+        stopReason: "length" as const,
+      });
+    })
+  );
+
+  assert.equal(requests[0]?.reasoning, "low");
+  assert.equal(requests[0]?.maxTokens, 1_200 + 4_096);
+  assert.match(
+    ctx.uiState.notifications.at(-1)?.message ?? "",
+    /stopped at the 5296-token output limit/
+  );
 });
 
 void test("provider errors are reported without a format retry", async () => {

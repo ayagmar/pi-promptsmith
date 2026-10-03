@@ -4,8 +4,10 @@ import {
   type AssistantMessage,
   type Context,
   contentText,
+  getSupportedThinkingLevels,
   type Model,
   type ModelsSimpleStreamOptions,
+  type ThinkingLevel,
 } from "@earendil-works/pi-ai";
 import {
   BorderedLoader,
@@ -13,7 +15,7 @@ import {
   type ExtensionContext,
   type ModelRegistry,
 } from "@earendil-works/pi-coding-agent";
-import { ENHANCER_MAX_OUTPUT_TOKENS } from "./constants.js";
+import { ENHANCER_MAX_OUTPUT_TOKENS, ENHANCER_REASONING_HEADROOM_TOKENS } from "./constants.js";
 import { buildPromptContext } from "./context.js";
 import { resolveTargetFamily } from "./model-routing.js";
 import { resolveEnhancerModel } from "./model-selection.js";
@@ -337,6 +339,8 @@ async function generateEnhancedPrompt(
             retryError,
             retryText,
             primaryResponse.stopReason === "length" || retryResponse.stopReason === "length"
+              ? getOutputTokenLimit(preparation.enhancerModel.model)
+              : undefined
           )
         );
       }
@@ -398,15 +402,31 @@ function buildCompletionOptions(
   preparation: EnhancementPreparation,
   requestSignal: AbortSignal
 ): CompleteOptions {
-  const modelMaxTokens = preparation.enhancerModel.model.maxTokens;
+  const model = preparation.enhancerModel.model;
+  const reasoning = getRequiredReasoningLevel(model);
   return {
     signal: requestSignal,
-    // Virtual models (pi 1.0 routers) may not declare a limit and report 0.
-    maxTokens:
-      modelMaxTokens > 0
-        ? Math.min(modelMaxTokens, ENHANCER_MAX_OUTPUT_TOKENS)
-        : ENHANCER_MAX_OUTPUT_TOKENS,
+    maxTokens: getOutputTokenLimit(model),
+    ...(reasoning ? { reasoning } : {}),
   };
+}
+
+/**
+ * Without a reasoning option pi-ai turns thinking off. Some models cannot turn it
+ * off, so the provider's default effort applies and, on OpenAI-style APIs, its
+ * reasoning tokens use up the output budget. Ask those models for their lowest level.
+ */
+function getRequiredReasoningLevel(model: Model<Api>): ThinkingLevel | undefined {
+  const lowest = getSupportedThinkingLevels(model)[0];
+  return lowest === undefined || lowest === "off" ? undefined : lowest;
+}
+
+function getOutputTokenLimit(model: Model<Api>): number {
+  const limit = getRequiredReasoningLevel(model)
+    ? ENHANCER_MAX_OUTPUT_TOKENS + ENHANCER_REASONING_HEADROOM_TOKENS
+    : ENHANCER_MAX_OUTPUT_TOKENS;
+  // Virtual models (pi 1.0 routers) may not declare a limit and report 0.
+  return model.maxTokens > 0 ? Math.min(model.maxTokens, limit) : limit;
 }
 
 function buildRetryRequest(request: Context): Context {
@@ -524,16 +544,14 @@ function buildInvalidModelOutputFailureMessage(
   primaryText: string,
   retryError: PromptsmithInvalidModelOutputError,
   retryText: string,
-  hitOutputLimit: boolean
+  outputLimitHit: number | undefined
 ): string {
   return [
     `Promptsmith enhancer model ${enhancerModelLabel} returned invalid output twice.`,
     `Primary failure: ${describeInvalidModelOutputReason(primaryError.reason)}.`,
     `Retry failure: ${describeInvalidModelOutputReason(retryError.reason)}.`,
-    ...(hitOutputLimit
-      ? [
-          `The response stopped at the ${ENHANCER_MAX_OUTPUT_TOKENS}-token output limit (stop reason: length).`,
-        ]
+    ...(outputLimitHit !== undefined
+      ? [`The response stopped at the ${outputLimitHit}-token output limit (stop reason: length).`]
       : []),
     `Expected exactly one sentinel block: ${buildSentinelReminder()}`,
     `Primary response preview: ${formatModelOutputPreview(primaryText)}`,
