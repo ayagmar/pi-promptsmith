@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
@@ -44,12 +44,14 @@ export class PromptsmithRuntimeState {
     this.replaceSettings(nextSettings);
   }
 
-  restoreSettings(): void {
-    const restoredSettings = restoreSettingsFromDisk(this.settingsPath);
-    this.replaceSettings(restoredSettings ?? cloneSettings(DEFAULT_SETTINGS));
+  /** Reloads the saved settings. Returns a warning when the file exists but is unusable. */
+  restoreSettings(): string | undefined {
+    const restored = readSettingsFromDisk(this.settingsPath);
+    this.replaceSettings(restored.settings ?? cloneSettings(DEFAULT_SETTINGS));
     this.busy = false;
     this.lastEnhancementAttempt = undefined;
     this.undo.clear();
+    return restored.warning;
   }
 
   getLastDraftResolution(): PromptsmithDraftResolution | undefined {
@@ -98,13 +100,34 @@ export function getGlobalSettingsPath(): string {
   return join(getAgentDir(), "promptsmith-settings.json");
 }
 
-function restoreSettingsFromDisk(path: string): PromptsmithSettings | undefined {
+function readSettingsFromDisk(path: string): {
+  settings?: PromptsmithSettings;
+  warning?: string;
+} {
+  const fallback = "Promptsmith is using its default settings until you save one.";
+  let raw: string;
   try {
-    const raw = readFileSync(path, "utf8");
-    return sanitizeSettings(JSON.parse(raw));
-  } catch {
-    return undefined;
+    raw = readFileSync(path, "utf8");
+  } catch (error) {
+    if (isRecord(error) && error.code === "ENOENT") {
+      return {};
+    }
+    return { warning: `Promptsmith could not read ${path}: ${describeError(error)}. ${fallback}` };
   }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    return { warning: `Promptsmith could not parse ${path}: ${describeError(error)}. ${fallback}` };
+  }
+
+  const settings = sanitizeSettings(parsed);
+  return settings
+    ? { settings }
+    : {
+        warning: `Promptsmith does not recognize the settings in ${path} (expected version ${DEFAULT_SETTINGS.version}). ${fallback}`,
+      };
 }
 
 export function sanitizeSettings(value: unknown): PromptsmithSettings | undefined {
@@ -174,9 +197,18 @@ export function cloneSettings(settings: PromptsmithSettings): PromptsmithSetting
   };
 }
 
+// Write a sibling temp file and rename it over the settings file, so a crash or a
+// full disk mid-write cannot leave a truncated file behind.
 function writeSettingsToDisk(path: string, settings: PromptsmithSettings): void {
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+  const tempPath = `${path}.${process.pid}.tmp`;
+  try {
+    writeFileSync(tempPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+    renameSync(tempPath, path);
+  } catch (error) {
+    rmSync(tempPath, { force: true });
+    throw error;
+  }
 }
 
 function sanitizeExactOverrides(value: unknown): ExactModelOverride[] {
@@ -310,6 +342,10 @@ function readEnhancementTimeoutMs(value: unknown): number {
   }
 
   return timeoutMs;
+}
+
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

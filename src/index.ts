@@ -139,7 +139,10 @@ export function createPromptsmithExtension(
   };
 
   const restorePersistedSettings = (ctx: ExtensionContext): void => {
-    runtime.restoreSettings();
+    const warning = runtime.restoreSettings();
+    if (warning && ctx.hasUI) {
+      ctx.ui.notify(warning, "warning");
+    }
     refreshStatus(ctx);
   };
 

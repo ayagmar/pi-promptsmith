@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "../src/constants.js";
 import { createPromptsmithExtension } from "../src/index.js";
 import { isDefaultShortcutReservedByPi } from "../src/shortcut-key.js";
+import { PromptsmithRuntimeState } from "../src/state.js";
 import { createCommandContext, createMockPi, createPersistedRuntimeState } from "./helpers.js";
 
 void test("extension registers the promptsmith command and shortcut", () => {
@@ -37,6 +41,23 @@ void test("default shortcut does not ignore disabled custom shortcut settings", 
   const messages = ctx.uiState.notifications.map((entry) => entry.message).join("\n");
   assert.match(messages, /shortcut is disabled globally/i);
   assert.doesNotMatch(messages, /shortcut is now ctrl\+alt\+p/i);
+});
+
+void test("session start warns when the saved settings cannot be read", async () => {
+  const harness = createMockPi();
+  const storageDir = mkdtempSync(join(tmpdir(), "promptsmith-extension-"));
+  const settingsPath = join(storageDir, "promptsmith-settings.json");
+  writeFileSync(settingsPath, "{ not json", "utf8");
+  createPromptsmithExtension(harness.pi, { runtime: new PromptsmithRuntimeState(settingsPath) });
+
+  const ctx = createCommandContext();
+  for (const handler of harness.events.get("session_start") ?? []) {
+    await handler({}, ctx);
+  }
+
+  const warning = ctx.uiState.notifications.at(-1);
+  assert.equal(warning?.type, "warning");
+  assert.match(warning?.message ?? "", /could not parse/);
 });
 
 void test("custom editor is not reinstalled when the shortcut setting is unchanged", async () => {
