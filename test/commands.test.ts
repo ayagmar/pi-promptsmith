@@ -294,15 +294,13 @@ void test("configured shortcut still enhances when invoked through the custom ed
   assert.equal(ctx.uiState.editorText, "Sharper prompt");
 });
 
-void test("shortcut expands Pi paste markers from the clipboard before enhancement", async () => {
+void test("literal paste-marker text is enhanced as written, without reading the clipboard", async () => {
   const runtime = createRuntimeState();
-  const ctx = createCommandContext({
-    model: createModel(),
-    editorText: "[paste #1 +12 lines]",
-  });
-  const clipboardText = Array.from({ length: 12 }, (_, index) => `line ${index + 1}`).join("\n");
+  const draft = "Explain why Pi shows [paste #1 +12 lines] in the editor";
+  const ctx = createCommandContext({ model: createModel(), editorText: draft });
 
   let requestText = "";
+  const execCalls: string[] = [];
   await handlePromptsmithShortcut(ctx, runtime, {
     completeFn: (_model, context) => {
       const userMessage = context.messages[0];
@@ -314,15 +312,19 @@ void test("shortcut expands Pi paste markers from the clipboard before enhanceme
       }
       return Promise.resolve(createCompleteResponse("Enhanced prompt"));
     },
-    exec: () => Promise.resolve({ stdout: clipboardText, stderr: "", code: 0, killed: false }),
+    exec: (command) => {
+      execCalls.push(command);
+      return Promise.resolve({ stdout: "unrelated clipboard", stderr: "", code: 0, killed: false });
+    },
     sendUserMessage: () => undefined,
     refreshStatus: () => undefined,
     runCancellableTask: (_ctx, _message, task) => task(new AbortController().signal),
     openSettings: () => Promise.resolve(),
   });
 
-  assert.match(requestText, /line 12/);
-  assert.doesNotMatch(requestText, /\[paste #1 \+12 lines\]/);
+  assert.match(requestText, /\[paste #1 \+12 lines\]/);
+  assert.doesNotMatch(requestText, /unrelated clipboard/);
+  assert.deepEqual(execCalls, []);
   assert.equal(ctx.uiState.editorText, "Enhanced prompt");
 });
 
