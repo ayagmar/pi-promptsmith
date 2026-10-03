@@ -392,9 +392,14 @@ function buildCompletionOptions(
   preparation: EnhancementPreparation,
   requestSignal: AbortSignal
 ): CompleteOptions {
+  const modelMaxTokens = preparation.enhancerModel.model.maxTokens;
   return {
     signal: requestSignal,
-    maxTokens: Math.min(preparation.enhancerModel.model.maxTokens, ENHANCER_MAX_OUTPUT_TOKENS),
+    // Virtual models (pi 1.0 routers) may not declare a limit and report 0.
+    maxTokens:
+      modelMaxTokens > 0
+        ? Math.min(modelMaxTokens, ENHANCER_MAX_OUTPUT_TOKENS)
+        : ENHANCER_MAX_OUTPUT_TOKENS,
   };
 }
 

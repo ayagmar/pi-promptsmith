@@ -180,6 +180,12 @@ function estimateProjectMetadataTokens(metadata: ProjectMetadata): number {
 }
 
 function computeSafeInputBudget(model: Model<Api>): number {
+  // Virtual models (pi 1.0 routers) may not declare a context window and report 0.
+  // The routed model is unknown here, so leave the size check to the provider.
+  if (model.contextWindow <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
   const outputReserve = Math.min(
     MAX_OUTPUT_RESERVE_TOKENS,
     Math.max(DEFAULT_OUTPUT_RESERVE_TOKENS, Math.floor(model.maxTokens / 2))

@@ -77,6 +77,34 @@ void test("promptsmith command leaves request auth to the model registry", async
   assert.equal(requestOptions?.headers, undefined);
 });
 
+void test("virtual enhancer models without declared limits can enhance drafts", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const model = createModel({
+    provider: "router",
+    id: "auto",
+    api: "pi-virtual",
+    baseUrl: "",
+    contextWindow: 0,
+    maxTokens: 0,
+  });
+  const ctx = createCommandContext({ model, allModels: [model], editorText: "fix this prompt" });
+  let requestOptions: Record<string, unknown> | undefined;
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, (_model, _context, options) => {
+      requestOptions = options ? { ...options } : undefined;
+      return Promise.resolve(createCompleteResponse("Enhanced prompt"));
+    })
+  );
+
+  assert.equal(ctx.uiState.editorText, "Enhanced prompt");
+  assert.equal(requestOptions?.maxTokens, 1_200);
+});
+
 void test("provider errors are reported without a format retry", async () => {
   const runtime = createRuntimeState();
   const harness = createMockPi();
