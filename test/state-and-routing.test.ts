@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -12,7 +12,7 @@ import {
   upsertExactModelOverride,
   upsertFamilyOverride,
 } from "../src/overrides.js";
-import { PromptsmithRuntimeState, sanitizeSettings } from "../src/state.js";
+import { getGlobalSettingsPath, PromptsmithRuntimeState, sanitizeSettings } from "../src/state.js";
 import { detectRuntimeSupport } from "../src/validation.js";
 import { createCommandContext, createModel, createRuntimeState } from "./helpers.js";
 
@@ -355,4 +355,25 @@ void test("runtime restore clears transient undo state", () => {
   assert.equal(runtime.undo.hasUndo(), false);
   assert.equal(runtime.getLastDraftResolution(), undefined);
   assert.equal(runtime.getLastEnhancementAttempt(), undefined);
+});
+
+void test("global settings live in the pi agent dir, honoring PI_CODING_AGENT_DIR", () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "promptsmith-agent-dir-"));
+  const previous = process.env.PI_CODING_AGENT_DIR;
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+
+  try {
+    const settingsPath = join(agentDir, "promptsmith-settings.json");
+    assert.equal(getGlobalSettingsPath(), settingsPath);
+
+    const runtime = new PromptsmithRuntimeState();
+    runtime.persistSettings({ ...runtime.getSettings(), rewriteMode: "plain" });
+    assert.equal(existsSync(settingsPath), true);
+  } finally {
+    if (previous === undefined) {
+      delete process.env.PI_CODING_AGENT_DIR;
+    } else {
+      process.env.PI_CODING_AGENT_DIR = previous;
+    }
+  }
 });
