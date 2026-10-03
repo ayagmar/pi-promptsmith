@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { type SessionEntry } from "@earendil-works/pi-coding-agent";
 import { buildPromptContext } from "../src/context.js";
 import {
   analyzeDraftIntent,
@@ -10,7 +11,13 @@ import { buildClaudeStrategyRequest } from "../src/strategies/claude.js";
 import { buildGptStrategyRequest } from "../src/strategies/gpt.js";
 import { type PromptsmithContextPayload } from "../src/types.js";
 import { buildStatusLine, buildStatusReport, refreshStatusLine } from "../src/ui/status.js";
-import { createCommandContext, createModel, createRuntimeState } from "./helpers.js";
+import {
+  createAssistantEntry,
+  createCommandContext,
+  createModel,
+  createRuntimeState,
+  createUserEntry,
+} from "./helpers.js";
 
 void test("intent classification detects implement-oriented drafts", () => {
   assert.equal(
@@ -136,6 +143,60 @@ void test("buildPromptContext does not claim missing conversation was dropped", 
 
   assert.equal(promptContext.recentConversation.length, 0);
   assert.equal(promptContext.droppedContext.includes("recent conversation"), false);
+});
+
+void test("buildPromptContext excerpts only what the model sees on the branch", async () => {
+  const model = createModel();
+  const runtime = createRuntimeState();
+  const redacted = createUserEntry("secret token sk-redacted");
+  const rewritten = createAssistantEntry("original assistant answer");
+  const entries: SessionEntry[] = [
+    {
+      type: "message",
+      id: "system-1",
+      parentId: null,
+      timestamp: new Date().toISOString(),
+      message: { role: "system", content: "You are pi.", timestamp: Date.now() },
+    },
+    redacted,
+    rewritten,
+    createUserEntry("kept user turn"),
+    {
+      type: "context_edit",
+      id: "edit-1",
+      parentId: null,
+      timestamp: new Date().toISOString(),
+      targetId: redacted.id,
+      replacement: null,
+    },
+    {
+      type: "context_edit",
+      id: "edit-2",
+      parentId: null,
+      timestamp: new Date().toISOString(),
+      targetId: rewritten.id,
+      replacement: { content: "edited assistant answer" },
+    },
+  ];
+  const ctx = createCommandContext({ model, entries });
+
+  const promptContext = await buildPromptContext({
+    ctx,
+    draft: "Explain how rewrite mode works.",
+    settings: { ...runtime.getSettings(), includeRecentConversation: true },
+    activeModel: model,
+    targetFamily: "gpt",
+    enhancerModel: model,
+    exec: () => Promise.resolve({ stdout: "", stderr: "", code: 0 }),
+  });
+
+  assert.deepEqual(
+    promptContext.recentConversation.map(({ role, text }) => ({ role, text })),
+    [
+      { role: "assistant", text: "edited assistant answer" },
+      { role: "user", text: "kept user turn" },
+    ]
+  );
 });
 
 void test("buildPromptContext caps the safe input budget to the enhancer model usable room", async () => {
