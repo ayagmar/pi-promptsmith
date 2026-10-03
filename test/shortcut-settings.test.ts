@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   findShortcutConflictAction,
   formatShortcutKey,
+  getCustomShortcutKey,
   isDefaultShortcutReservedByPi,
   matchesCustomShortcut,
   normalizeShortcutKey,
@@ -19,7 +20,7 @@ void test("shortcut keys normalize into Pi's canonical format", () => {
 });
 
 void test("shortcut validation rejects plain typing keys and Pi conflicts", () => {
-  assert.match(validateShortcutKey("p").error ?? "", /must include alt and\/or ctrl/i);
+  assert.match(validateShortcutKey("p").error ?? "", /must include ctrl, alt or super/i);
 
   const conflict = validateShortcutKey("ctrl+p", {
     "app.model.cycleForward": "ctrl+p",
@@ -28,6 +29,29 @@ void test("shortcut validation rejects plain typing keys and Pi conflicts", () =
   assert.match(conflict ?? "", /model cycle forward/i);
 
   assert.equal(validateShortcutKey("ctrl+alt+p").normalized, "ctrl+alt+p");
+});
+
+void test("every shortcut the capture dialog accepts also works in the editor", () => {
+  const settings = createRuntimeState().getSettings();
+  const accepted = ["alt+1", "ctrl+alt+/", "ctrl+alt+insert", "ctrl+alt+pageup", "super+k"];
+
+  for (const shortcutKey of accepted) {
+    const normalized = validateShortcutKey(shortcutKey).normalized;
+    assert.equal(normalized, shortcutKey);
+    assert.equal(getCustomShortcutKey({ ...settings, shortcutKey }), shortcutKey);
+  }
+
+  assert.equal(matchesCustomShortcut("\u001b1", { ...settings, shortcutKey: "alt+1" }, {}), true);
+  assert.equal(matchesCustomShortcut("\u001b/", { ...settings, shortcutKey: "alt+/" }, {}), true);
+});
+
+void test("shortcut validation rejects keys pi cannot match with modifiers", () => {
+  const settings = createRuntimeState().getSettings();
+
+  for (const shortcutKey of ["alt+f5", "ctrl+alt+escape", "alt+esc"]) {
+    assert.match(validateShortcutKey(shortcutKey).error ?? "", /escape or f1-f12/i);
+    assert.equal(getCustomShortcutKey({ ...settings, shortcutKey }), undefined);
+  }
 });
 
 void test("shortcut conflict lookup finds matching built-in actions", () => {
