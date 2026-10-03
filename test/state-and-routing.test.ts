@@ -162,8 +162,9 @@ void test("resolveEnhancerModel validates the enhancer configuration", () => {
   );
 });
 
-void test("setFamilyEnhancerModel clears orphaned partial family selections", () => {
+void test("setFamilyEnhancerModel keeps a single pick until both families are set", () => {
   const runtime = createRuntimeState();
+  const fixedModel = { provider: "openai", id: "gpt-5-mini" };
   const gptModel = { provider: "openai", id: "gpt-5" };
   const claudeModel = { provider: "anthropic", id: "claude-3-5-sonnet" };
 
@@ -171,15 +172,20 @@ void test("setFamilyEnhancerModel clears orphaned partial family selections", ()
     {
       ...runtime.getSettings(),
       enhancerModelMode: "fixed",
-      fixedEnhancerModel: gptModel,
+      fixedEnhancerModel: fixedModel,
     },
     "gpt",
     gptModel
   );
 
-  assert.equal(partial.enhancerModelMode, "active");
-  assert.equal(partial.fixedEnhancerModel, undefined);
-  assert.equal(partial.familyEnhancerModels, undefined);
+  assert.equal(partial.enhancerModelMode, "fixed");
+  assert.deepEqual(partial.fixedEnhancerModel, fixedModel);
+  assert.deepEqual(partial.familyEnhancerModels, { gpt: gptModel });
+
+  const promoted = setFamilyEnhancerModel(partial, "claude", claudeModel);
+
+  assert.equal(promoted.enhancerModelMode, "family-linked");
+  assert.equal(promoted.fixedEnhancerModel, undefined);
 
   const linked = setFamilyEnhancerModel(
     {

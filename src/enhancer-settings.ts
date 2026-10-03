@@ -28,6 +28,9 @@ export function clearFixedEnhancerModel(settings: PromptsmithSettings): Promptsm
   return next;
 }
 
+// One family model is kept on its own until the other family has a model too.
+// Only then does the enhancer switch to family-linked mode, so the current mode
+// (and its fixed model) keeps working in between.
 export function setFamilyEnhancerModel(
   settings: PromptsmithSettings,
   family: PromptsmithFamily,
@@ -37,40 +40,36 @@ export function setFamilyEnhancerModel(
     ...(settings.familyEnhancerModels ?? {}),
     [family]: modelRef,
   };
-  const enhancerModelMode =
-    familyEnhancerModels.gpt && familyEnhancerModels.claude
-      ? ("family-linked" as const)
-      : settings.enhancerModelMode === "fixed"
-        ? ("active" as const)
-        : settings.enhancerModelMode;
+  if (!familyEnhancerModels.gpt || !familyEnhancerModels.claude) {
+    return { ...settings, familyEnhancerModels };
+  }
+
   const next: PromptsmithSettings = {
     ...settings,
-    enhancerModelMode,
+    enhancerModelMode: "family-linked",
     familyEnhancerModels,
   };
   delete next.fixedEnhancerModel;
-  if (next.enhancerModelMode !== "family-linked") {
-    delete next.familyEnhancerModels;
-  }
   return next;
 }
 
+// Family-linked mode needs both models, so clearing one falls back to the active
+// model while the other family keeps its selection.
 export function clearFamilyEnhancerModel(
   settings: PromptsmithSettings,
   family: PromptsmithFamily
 ): PromptsmithSettings {
-  if (settings.enhancerModelMode === "family-linked") {
-    return setActiveEnhancerModelMode(settings);
-  }
+  const familyEnhancerModels = { ...(settings.familyEnhancerModels ?? {}) };
+  delete familyEnhancerModels[family];
 
-  const nextFamilyModels = { ...(settings.familyEnhancerModels ?? {}) };
-  delete nextFamilyModels[family];
-
-  if (Object.keys(nextFamilyModels).length === 0) {
-    const next = { ...settings };
+  const next: PromptsmithSettings = {
+    ...settings,
+    enhancerModelMode:
+      settings.enhancerModelMode === "family-linked" ? "active" : settings.enhancerModelMode,
+    familyEnhancerModels,
+  };
+  if (!familyEnhancerModels.gpt && !familyEnhancerModels.claude) {
     delete next.familyEnhancerModels;
-    return next;
   }
-
-  return { ...settings, familyEnhancerModels: nextFamilyModels };
+  return next;
 }
