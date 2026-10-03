@@ -2,10 +2,10 @@ import { type PromptsmithSettings } from "./types.js";
 
 export const EXTENSION_NAME = "pi-promptsmith";
 export const EXTENSION_COMMAND = "promptsmith";
-// Avoid Pi built-ins and common extension collisions.
+// Free in pi except on Windows and WSL, where pi uses it for app.model.cycleBackward.
 export const DEFAULT_SHORTCUT_KEY = "alt+p";
 
-export const SETTINGS_VERSION = 1;
+const SETTINGS_VERSION = 1;
 export const SENTINEL_OPEN = "<promptsmith-enhanced-prompt>";
 export const SENTINEL_CLOSE = "</promptsmith-enhanced-prompt>";
 
