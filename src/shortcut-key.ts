@@ -2,7 +2,7 @@ import { type KeyId, matchesKey } from "@earendil-works/pi-tui";
 import { DEFAULT_SHORTCUT_KEY } from "./constants.js";
 import { type PromptsmithSettings } from "./types.js";
 
-const MODIFIER_ORDER = ["ctrl", "shift", "alt"] as const;
+const MODIFIER_ORDER = ["ctrl", "shift", "alt", "super"] as const;
 const MODIFIERS = new Set<string>(MODIFIER_ORDER);
 const SPECIAL_KEYS = new Set<string>([
   "escape",
@@ -87,21 +87,21 @@ const DISPLAY_NAMES: Record<string, string> = {
   left: "Left",
   right: "Right",
 };
-const VALID_KEY_ID_SPECIAL_KEYS = new Set<string>([
+// pi-tui's matchesKey() never matches these keys once a modifier is held.
+const UNMODIFIABLE_KEYS = new Set<string>([
   "escape",
-  "enter",
-  "tab",
-  "space",
-  "backspace",
-  "delete",
-  "home",
-  "end",
-  "pageup",
-  "pagedown",
-  "up",
-  "down",
-  "left",
-  "right",
+  "f1",
+  "f2",
+  "f3",
+  "f4",
+  "f5",
+  "f6",
+  "f7",
+  "f8",
+  "f9",
+  "f10",
+  "f11",
+  "f12",
 ]);
 
 interface ShortcutParts {
@@ -145,9 +145,17 @@ export function validateShortcutKey(
     };
   }
 
-  if (!hasShortcutModifier(normalized.split("+"))) {
+  const parts = normalized.split("+");
+  if (!hasShortcutModifier(parts)) {
     return {
-      error: "Promptsmith shortcuts must include Alt and/or Ctrl so normal typing keeps working.",
+      error:
+        "Promptsmith shortcuts must include Ctrl, Alt or Super so normal typing keeps working.",
+    };
+  }
+
+  if (UNMODIFIABLE_KEYS.has(parts.at(-1) ?? "")) {
+    return {
+      error: "Pi cannot detect Escape or F1-F12 with modifiers held. Pick a different key.",
     };
   }
 
@@ -222,20 +230,14 @@ export function getCustomShortcutKey(
     return undefined;
   }
 
-  const shortcutKey = normalizeShortcutKey(settings.shortcutKey);
+  // Same rules as the capture dialog, so a shortcut it accepts also works.
+  const shortcutKey = validateShortcutKey(settings.shortcutKey, effectiveKeybindings).normalized;
   if (!shortcutKey || shortcutKey === DEFAULT_SHORTCUT_KEY) {
     return undefined;
   }
 
-  if (!isValidKeyId(shortcutKey)) {
-    return undefined;
-  }
-
-  if (effectiveKeybindings && findShortcutConflictAction(shortcutKey, effectiveKeybindings)) {
-    return undefined;
-  }
-
-  return shortcutKey;
+  // Normalized combos use pi-tui's KeyId grammar; matchesKey() ignores case.
+  return shortcutKey as KeyId;
 }
 
 export function matchesCustomShortcut(
@@ -249,38 +251,6 @@ export function matchesCustomShortcut(
   }
 
   return matchesKey(data, shortcutKey);
-}
-
-function isValidKeyId(value: string): value is KeyId {
-  const parts = parseShortcutParts(value);
-  if (!parts) {
-    return false;
-  }
-
-  const modifierSet = new Set(parts.modifiers);
-  if (modifierSet.size !== parts.modifiers.length) {
-    return false;
-  }
-
-  for (const modifier of modifierSet) {
-    if (!MODIFIERS.has(modifier)) {
-      return false;
-    }
-  }
-
-  if (!hasShortcutModifier(modifierSet)) {
-    return false;
-  }
-
-  if (SYMBOL_KEYS.has(parts.key)) {
-    return false;
-  }
-
-  if (/^[a-z]$/.test(parts.key)) {
-    return true;
-  }
-
-  return VALID_KEY_ID_SPECIAL_KEYS.has(parts.key);
 }
 
 function parseShortcutParts(value: string | undefined): ShortcutParts | undefined {
@@ -344,7 +314,7 @@ function normalizeBaseKey(value: string | undefined): string | undefined {
 
 function hasShortcutModifier(tokens: Iterable<string>): boolean {
   for (const token of tokens) {
-    if (token === "ctrl" || token === "alt") {
+    if (token === "ctrl" || token === "alt" || token === "super") {
       return true;
     }
   }
