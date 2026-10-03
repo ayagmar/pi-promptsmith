@@ -3,10 +3,13 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { type CustomEditor } from "@earendil-works/pi-coding-agent";
+import { KeybindingsManager, TUI_KEYBINDINGS } from "@earendil-works/pi-tui";
 import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "../src/constants.js";
 import { createPromptsmithExtension } from "../src/index.js";
 import { isDefaultShortcutReservedByPi } from "../src/shortcut-key.js";
 import { PromptsmithRuntimeState } from "../src/state.js";
+import { createBasePromptsmithEditor } from "../src/ui/promptsmith-editor.js";
 import { createCommandContext, createMockPi, createPersistedRuntimeState } from "./helpers.js";
 
 void test("extension registers the promptsmith command and shortcut", () => {
@@ -144,4 +147,28 @@ void test("session shutdown clears the custom editor component", async () => {
     ctx.uiState.editorComponentHistory.map((entry) => entry.kind),
     ["set", "clear"]
   );
+});
+
+void test("the fallback editor embeds pi's working indicator like pi's default editor", () => {
+  const tui = { requestRender: () => undefined, terminal: { rows: 40, columns: 80 } };
+  const theme = {
+    borderColor: (text: string) => text,
+    selectList: {
+      selectedPrefix: (text: string) => text,
+      selectedText: (text: string) => text,
+      description: (text: string) => text,
+      scrollInfo: (text: string) => text,
+      noMatch: (text: string) => text,
+    },
+  };
+
+  const editor = createBasePromptsmithEditor(
+    tui as unknown as Parameters<typeof createBasePromptsmithEditor>[0],
+    theme,
+    new KeybindingsManager(TUI_KEYBINDINGS) as unknown as Parameters<
+      typeof createBasePromptsmithEditor
+    >[2]
+  );
+
+  assert.equal((editor as CustomEditor).embedWorkingStatus, true);
 });

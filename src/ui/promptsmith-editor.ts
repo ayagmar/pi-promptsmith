@@ -8,7 +8,8 @@ export function createBasePromptsmithEditor(
   theme: EditorTheme,
   keybindings: KeybindingsManager
 ): EditorComponent {
-  return new CustomEditor(tui, theme, keybindings);
+  // Same as pi's default editor; pi copies padding and autocomplete onto it.
+  return new CustomEditor(tui, theme, keybindings, { embedWorkingStatus: true });
 }
 
 export function attachPromptsmithShortcut(
