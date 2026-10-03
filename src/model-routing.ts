@@ -56,20 +56,30 @@ export function normalize(value: string): string {
 }
 
 function resolveBuiltinFamily(provider: string, id: string): ResolvedTargetFamily | undefined {
-  if (provider === "openai" || id.startsWith("gpt") || /^o[1-9]/.test(id)) {
+  const name = modelName(id);
+  if (provider === "openai" || name.startsWith("gpt") || /^o[1-9]/.test(name)) {
     return { family: "gpt", source: "builtin", matchedRule: "openai/gpt*" };
   }
 
   if (
     provider === "anthropic" ||
     provider === "moonshot" ||
-    id.startsWith("claude") ||
-    id.startsWith("kimi")
+    name.startsWith("claude") ||
+    name.startsWith("kimi")
   ) {
     return { family: "claude", source: "builtin", matchedRule: "anthropic|moonshot|claude*|kimi*" };
   }
 
   return undefined;
+}
+
+// Gateways put the vendor in the id ("anthropic/claude-…" on OpenRouter and Vercel,
+// "@cf/moonshotai/kimi-…" on Cloudflare) and Bedrock adds a region and vendor
+// ("us.anthropic.claude-…"). Match the built-in rules on the model name itself.
+function modelName(id: string): string {
+  return id
+    .slice(id.lastIndexOf("/") + 1)
+    .replace(/^(?:[a-z]+\.)*(?:anthropic|openai|moonshotai)\./, "");
 }
 
 function globToRegExp(pattern: string): RegExp {

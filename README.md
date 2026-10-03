@@ -281,8 +281,8 @@ Target-family routing order:
 
 Built-in defaults include:
 
-- OpenAI GPT / o-series → `gpt`
-- Anthropic Claude → `claude`
+- OpenAI GPT / o-series → `gpt`, also through gateways and Bedrock (`openai/gpt-5` on OpenRouter)
+- Anthropic Claude → `claude`, also through gateways and Bedrock (`anthropic/claude-*` on OpenRouter, `us.anthropic.claude-*` on Bedrock)
 - Moonshot / Kimi-style identifiers → `claude`
 
 Enhancer model execution is configured separately:
