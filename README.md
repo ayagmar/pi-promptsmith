@@ -11,6 +11,8 @@ It supports two output styles:
 
 ## Installation
 
+Requires Pi 1.0 or newer. Use `pi-promptsmith@0.4` with older Pi releases.
+
 Run it once in Pi without installing:
 
 ```bash
