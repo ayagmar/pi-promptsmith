@@ -8,6 +8,7 @@ import {
   MIN_ENHANCEMENT_TIMEOUT_MS,
 } from "./constants.js";
 import { normalize } from "./model-routing.js";
+import { findDefaultShortcutReservedAction } from "./pi-keybindings.js";
 import { validateShortcutKey } from "./shortcut-key.js";
 import {
   type ExactModelOverride,
@@ -25,9 +26,23 @@ export class PromptsmithRuntimeState {
   private busy = false;
   private lastDraftResolution: PromptsmithDraftResolution | undefined;
   private lastEnhancementAttempt: PromptsmithEnhancementAttempt | undefined;
+  private defaultShortcutReservedAction: { action: string | undefined } | undefined;
   readonly undo = new UndoManager();
 
-  constructor(private readonly settingsPath = getGlobalSettingsPath()) {}
+  constructor(
+    private readonly settingsPath = getGlobalSettingsPath(),
+    private readonly resolveDefaultShortcutReservedAction: () => string | undefined = () =>
+      findDefaultShortcutReservedAction()
+  ) {}
+
+  /**
+   * The reserved pi action bound to Alt+P, if any; pi then skips Promptsmith's Alt+P.
+   * Resolved once from pi's keybindings so registration, status and settings agree.
+   */
+  getDefaultShortcutReservedAction(): string | undefined {
+    this.defaultShortcutReservedAction ??= { action: this.resolveDefaultShortcutReservedAction() };
+    return this.defaultShortcutReservedAction.action;
+  }
 
   getSettings(): PromptsmithSettings {
     return cloneSettings(this.settings);

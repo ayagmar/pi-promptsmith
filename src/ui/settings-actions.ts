@@ -17,9 +17,9 @@ import {
   upsertFamilyOverride,
 } from "../overrides.js";
 import {
+  describePiAction,
   formatShortcutKey,
   isDefaultShortcutConfigured,
-  isDefaultShortcutReservedByPi,
 } from "../shortcut-key.js";
 import { cloneSettings, type PromptsmithRuntimeState } from "../state.js";
 import { type ModelRef, type PromptsmithFamily, type PromptsmithSettings } from "../types.js";
@@ -107,7 +107,8 @@ export async function runSettingsAction(
             runtime,
             services,
             (latest) => ({ ...latest, shortcutEnabled: true, shortcutKey }),
-            (next) => describeShortcutChange(`set to ${formatShortcutKey(shortcutKey)}`, next)
+            (next) =>
+              describeShortcutChange(`set to ${formatShortcutKey(shortcutKey)}`, next, runtime)
           );
           return;
         }
@@ -127,7 +128,7 @@ export async function runSettingsAction(
             runtime,
             services,
             (latest) => ({ ...latest, shortcutKey: DEFAULT_SHORTCUT_KEY }),
-            (next) => describeShortcutChange("reset to Alt+P", next)
+            (next) => describeShortcutChange("reset to Alt+P", next, runtime)
           );
           return;
         default:
@@ -721,11 +722,17 @@ function describeFamilyModelChange(
 }
 
 // The capture dialog's Backspace and the reset row both pick Alt+P, which pi keeps
-// for itself on Windows and WSL, so say that it will not run Promptsmith there.
-function describeShortcutChange(change: string, next: PromptsmithSettings): string {
+// for itself when a reserved action holds it (by default on Windows and WSL), so
+// say that it will not run Promptsmith there.
+function describeShortcutChange(
+  change: string,
+  next: PromptsmithSettings,
+  runtime: PromptsmithRuntimeState
+): string {
   const message = `Keyboard shortcut ${change}.`;
-  return isDefaultShortcutConfigured(next) && isDefaultShortcutReservedByPi()
-    ? `${message} Pi uses Alt+P for the previous model on this platform, so it will not run Promptsmith. Pick another key.`
+  const reservedAction = runtime.getDefaultShortcutReservedAction();
+  return isDefaultShortcutConfigured(next) && reservedAction
+    ? `${message} Pi uses Alt+P for ${describePiAction(reservedAction)}, so it will not run Promptsmith. Pick another key.`
     : message;
 }
 

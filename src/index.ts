@@ -7,11 +7,7 @@ import {
   runEnhancementWithLoader,
 } from "./enhance.js";
 import { handlePromptsmithShortcut } from "./shortcut.js";
-import {
-  formatShortcutKey,
-  getCustomShortcutKey,
-  isDefaultShortcutReservedByPi,
-} from "./shortcut-key.js";
+import { formatShortcutKey, getCustomShortcutKey } from "./shortcut-key.js";
 import { PromptsmithRuntimeState } from "./state.js";
 import { attachPromptsmithShortcut, createBasePromptsmithEditor } from "./ui/promptsmith-editor.js";
 import { openSettingsUi } from "./ui/settings.js";
@@ -173,9 +169,10 @@ export function createPromptsmithExtension(
     },
   });
 
-  // Where pi reserves Alt+P for its own model cycling it would skip this
-  // registration with a startup warning; a custom shortcut still works there.
-  if (!isDefaultShortcutReservedByPi()) {
+  // Where pi's keybindings give Alt+P to a reserved action (by default model
+  // cycling on Windows and WSL), pi would skip this registration with a startup
+  // warning; a custom shortcut still works there.
+  if (!runtime.getDefaultShortcutReservedAction()) {
     pi.registerShortcut(DEFAULT_SHORTCUT_KEY, {
       description: "Enhance the current editor prompt",
       handler: async (ctx) => {

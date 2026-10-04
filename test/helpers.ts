@@ -182,16 +182,21 @@ export function createMockPi(): MockPiHarness {
   return { pi, commands, shortcuts, events, userMessages };
 }
 
-export function createRuntimeState(): PromptsmithRuntimeState {
+// Tests do not read the machine's pi keybindings; by default nothing in pi holds Alt+P.
+export function createRuntimeState(options?: {
+  defaultShortcutReservedAction?: string;
+}): PromptsmithRuntimeState {
   return new PromptsmithRuntimeState(
-    join(mkdtempSync(join(tmpdir(), "promptsmith-test-state-")), "promptsmith-settings.json")
+    join(mkdtempSync(join(tmpdir(), "promptsmith-test-state-")), "promptsmith-settings.json"),
+    () => options?.defaultShortcutReservedAction
   );
 }
 
 export function createPersistedRuntimeState(
-  overrides: Partial<PromptsmithSettings>
+  overrides: Partial<PromptsmithSettings>,
+  options?: { defaultShortcutReservedAction?: string }
 ): PromptsmithRuntimeState {
-  const runtime = createRuntimeState();
+  const runtime = createRuntimeState(options);
   runtime.persistSettings({ ...DEFAULT_SETTINGS, ...overrides });
   return runtime;
 }

@@ -40,7 +40,7 @@ Write a rough request in the Pi editor, then:
 - press `Alt+P` by default (or your custom Promptsmith shortcut), or
 - run `/promptsmith`
 
-On Windows and WSL, Pi 1.0 uses `Alt+P` for "cycle to previous model" and does not let extensions take it over, so Promptsmith leaves it to Pi there. Pick another key (for example `Ctrl+Alt+P`) under **Keyboard shortcut** in `/promptsmith settings`, or use `/promptsmith`.
+On Windows and WSL, Pi 1.0 uses `Alt+P` for "cycle to previous model" and does not let extensions take it over, so Promptsmith leaves it to Pi there. The same happens on any platform where your Pi `keybindings.json` gives `Alt+P` to one of Pi's reserved actions; if you move Pi's action off `Alt+P` there, Promptsmith takes it after `/reload`. Pick another key (for example `Ctrl+Alt+P`) under **Keyboard shortcut** in `/promptsmith settings`, or use `/promptsmith`.
 
 Promptsmith rewrites the current draft directly in the editor.
 
