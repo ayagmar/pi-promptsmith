@@ -16,7 +16,11 @@ import {
   upsertExactModelOverride,
   upsertFamilyOverride,
 } from "../overrides.js";
-import { formatShortcutKey, isDefaultShortcutConfigured } from "../shortcut-key.js";
+import {
+  formatShortcutKey,
+  isDefaultShortcutConfigured,
+  isDefaultShortcutReservedByPi,
+} from "../shortcut-key.js";
 import { cloneSettings, type PromptsmithRuntimeState } from "../state.js";
 import { type ModelRef, type PromptsmithFamily, type PromptsmithSettings } from "../types.js";
 import { parseEnhancementTimeoutSeconds } from "../validation.js";
@@ -103,7 +107,7 @@ export async function runSettingsAction(
             runtime,
             services,
             (latest) => ({ ...latest, shortcutEnabled: true, shortcutKey }),
-            `Keyboard shortcut set to ${formatShortcutKey(shortcutKey)}.`
+            (next) => describeShortcutChange(`set to ${formatShortcutKey(shortcutKey)}`, next)
           );
           return;
         }
@@ -123,7 +127,7 @@ export async function runSettingsAction(
             runtime,
             services,
             (latest) => ({ ...latest, shortcutKey: DEFAULT_SHORTCUT_KEY }),
-            "Keyboard shortcut reset to Alt+P."
+            (next) => describeShortcutChange("reset to Alt+P", next)
           );
           return;
         default:
@@ -714,6 +718,15 @@ function describeFamilyModelChange(
       ? "family-linked mode needs both."
       : "enhancer model choice then switches to family-linked.";
   return `${message} Choose a ${FAMILY_STYLE_LABELS[otherFamily]} model too; ${hint}`;
+}
+
+// The capture dialog's Backspace and the reset row both pick Alt+P, which pi keeps
+// for itself on Windows and WSL, so say that it will not run Promptsmith there.
+function describeShortcutChange(change: string, next: PromptsmithSettings): string {
+  const message = `Keyboard shortcut ${change}.`;
+  return isDefaultShortcutConfigured(next) && isDefaultShortcutReservedByPi()
+    ? `${message} Pi uses Alt+P for the previous model on this platform, so it will not run Promptsmith. Pick another key.`
+    : message;
 }
 
 function formatModel(model: Model<Api>): string {
