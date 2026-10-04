@@ -646,35 +646,23 @@ void test("enhancement retries once when the first model response breaks the sen
   );
 });
 
-void test("resetting the shortcut to Alt+P warns where pi keeps Alt+P for itself", {
-  skip: process.platform === "darwin" && "Alt+P is never reserved by pi on macOS",
-}, async () => {
-  const previous = process.env.WSL_DISTRO_NAME;
-  process.env.WSL_DISTRO_NAME = "Ubuntu";
-  try {
-    const runtime = createRuntimeState();
-    runtime.replaceSettings({ ...runtime.getSettings(), shortcutKey: "ctrl+alt+p" });
-    const ctx = createCommandContext();
-    Object.assign(ctx.ui, {
-      custom: (_factory: unknown) => Promise.resolve("Reset to Alt+P"),
-    });
+void test("resetting the shortcut to Alt+P warns where pi keeps Alt+P for itself", async () => {
+  const runtime = createRuntimeState({ defaultShortcutReservedAction: "app.model.cycleBackward" });
+  runtime.replaceSettings({ ...runtime.getSettings(), shortcutKey: "ctrl+alt+p" });
+  const ctx = createCommandContext();
+  Object.assign(ctx.ui, {
+    custom: (_factory: unknown) => Promise.resolve("Reset to Alt+P"),
+  });
 
-    await runSettingsAction("shortcutEnabled", {
-      ctx,
-      runtime,
-      services: { refreshStatus: () => undefined },
-    });
+  await runSettingsAction("shortcutEnabled", {
+    ctx,
+    runtime,
+    services: { refreshStatus: () => undefined },
+  });
 
-    assert.equal(runtime.getSettings().shortcutKey, "alt+p");
-    assert.match(
-      ctx.uiState.notifications.at(-1)?.message ?? "",
-      /^Keyboard shortcut reset to Alt\+P\. Pi uses Alt\+P for the previous model on this platform/
-    );
-  } finally {
-    if (previous === undefined) {
-      delete process.env.WSL_DISTRO_NAME;
-    } else {
-      process.env.WSL_DISTRO_NAME = previous;
-    }
-  }
+  assert.equal(runtime.getSettings().shortcutKey, "alt+p");
+  assert.match(
+    ctx.uiState.notifications.at(-1)?.message ?? "",
+    /^Keyboard shortcut reset to Alt\+P\. Pi uses Alt\+P for the previous model, so it will not run Promptsmith/
+  );
 });

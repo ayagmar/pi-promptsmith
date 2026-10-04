@@ -7,25 +7,37 @@ import { type CustomEditor } from "@earendil-works/pi-coding-agent";
 import { KeybindingsManager, TUI_KEYBINDINGS } from "@earendil-works/pi-tui";
 import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "../src/constants.js";
 import { createPromptsmithExtension } from "../src/index.js";
-import { isDefaultShortcutReservedByPi } from "../src/shortcut-key.js";
 import { PromptsmithRuntimeState } from "../src/state.js";
 import { createBasePromptsmithEditor } from "../src/ui/promptsmith-editor.js";
-import { createCommandContext, createMockPi, createPersistedRuntimeState } from "./helpers.js";
+import {
+  createCommandContext,
+  createMockPi,
+  createPersistedRuntimeState,
+  createRuntimeState,
+} from "./helpers.js";
 
 void test("extension registers the promptsmith command and shortcut", () => {
   const harness = createMockPi();
 
-  createPromptsmithExtension(harness.pi);
+  createPromptsmithExtension(harness.pi, { runtime: createRuntimeState() });
 
   assert.ok(harness.commands.has(EXTENSION_COMMAND));
-  // On Windows and WSL pi reserves Alt+P for model cycling, so it is not registered.
-  assert.equal(harness.shortcuts.has(DEFAULT_SHORTCUT_KEY), !isDefaultShortcutReservedByPi());
+  assert.ok(harness.shortcuts.has(DEFAULT_SHORTCUT_KEY));
   assert.ok(!("toolName" in harness));
 });
 
-void test("default shortcut does not ignore disabled custom shortcut settings", {
-  skip: isDefaultShortcutReservedByPi() && "Alt+P is reserved by pi on this platform",
-}, async () => {
+void test("extension leaves Alt+P to pi when pi's keybindings reserve it", () => {
+  const harness = createMockPi();
+
+  createPromptsmithExtension(harness.pi, {
+    runtime: createRuntimeState({ defaultShortcutReservedAction: "app.model.cycleBackward" }),
+  });
+
+  assert.ok(harness.commands.has(EXTENSION_COMMAND));
+  assert.equal(harness.shortcuts.has(DEFAULT_SHORTCUT_KEY), false);
+});
+
+void test("default shortcut does not ignore disabled custom shortcut settings", async () => {
   const harness = createMockPi();
   const runtime = createPersistedRuntimeState({
     shortcutKey: "ctrl+alt+p",

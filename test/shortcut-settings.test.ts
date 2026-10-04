@@ -1,11 +1,18 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 import { DEFAULT_SETTINGS } from "../src/constants.js";
+import {
+  findDefaultShortcutReservedAction,
+  readPiKeybindingsEnvironment,
+  usesWindowsKeybindings,
+} from "../src/pi-keybindings.js";
 import {
   findShortcutConflictAction,
   formatShortcutKey,
   getCustomShortcutKey,
-  isDefaultShortcutReservedByPi,
   matchesCustomShortcut,
   normalizeShortcutKey,
   validateShortcutKey,
@@ -103,10 +110,82 @@ void test("status report includes the configured shortcut key", () => {
   assert.equal(formatShortcutKey("ctrl++"), "Ctrl++");
 });
 
-void test("pi reserves the default Alt+P shortcut only where it uses Windows keybindings", () => {
-  assert.equal(isDefaultShortcutReservedByPi("win32", {}), true);
-  assert.equal(isDefaultShortcutReservedByPi("linux", { WSL_DISTRO_NAME: "Ubuntu" }), true);
-  assert.equal(isDefaultShortcutReservedByPi("linux", { WSL_INTEROP: "/run/WSL/1_interop" }), true);
-  assert.equal(isDefaultShortcutReservedByPi("linux", {}), false);
-  assert.equal(isDefaultShortcutReservedByPi("darwin", { WSL_DISTRO_NAME: "Ubuntu" }), false);
+void test("pi uses its Windows keybindings on Windows and WSL", () => {
+  assert.equal(usesWindowsKeybindings("win32", {}), true);
+  assert.equal(usesWindowsKeybindings("linux", { WSL_DISTRO_NAME: "Ubuntu" }), true);
+  assert.equal(usesWindowsKeybindings("linux", { WSL_INTEROP: "/run/WSL/1_interop" }), true);
+  assert.equal(usesWindowsKeybindings("linux", {}), false);
+  assert.equal(usesWindowsKeybindings("darwin", { WSL_DISTRO_NAME: "Ubuntu" }), false);
+});
+
+void test("Alt+P is reserved by pi's default keybindings only with Windows defaults", () => {
+  assert.equal(
+    findDefaultShortcutReservedAction({ userKeybindings: undefined, windowsDefaults: true }),
+    "app.model.cycleBackward"
+  );
+  assert.equal(
+    findDefaultShortcutReservedAction({ userKeybindings: undefined, windowsDefaults: false }),
+    undefined
+  );
+});
+
+void test("Alt+P reservation follows the user's keybindings.json", () => {
+  // Windows user who moved previous-model off Alt+P: Alt+P is free again.
+  assert.equal(
+    findDefaultShortcutReservedAction({
+      userKeybindings: { "app.model.cycleBackward": "shift+ctrl+p" },
+      windowsDefaults: true,
+    }),
+    undefined
+  );
+  // Legacy names are migrated the way pi does.
+  assert.equal(
+    findDefaultShortcutReservedAction({
+      userKeybindings: { cycleModelBackward: ["shift+ctrl+p"] },
+      windowsDefaults: true,
+    }),
+    undefined
+  );
+  // Linux user who bound a reserved action to Alt+P.
+  assert.equal(
+    findDefaultShortcutReservedAction({
+      userKeybindings: { "app.model.select": ["ctrl+l", "Alt+P"] },
+      windowsDefaults: false,
+    }),
+    "app.model.select"
+  );
+  // Non-reserved actions only make pi warn, so Promptsmith still registers Alt+P.
+  assert.equal(
+    findDefaultShortcutReservedAction({
+      userKeybindings: { "app.session.tree": "alt+p" },
+      windowsDefaults: false,
+    }),
+    undefined
+  );
+});
+
+void test("Alt+P reservation reads keybindings.json from pi's agent dir", () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "promptsmith-keybindings-"));
+  writeFileSync(
+    join(agentDir, "keybindings.json"),
+    JSON.stringify({ "app.model.cycleBackward": "shift+ctrl+p" }),
+    "utf8"
+  );
+  const remapped = readPiKeybindingsEnvironment(agentDir, "win32", {});
+  assert.equal(findDefaultShortcutReservedAction(remapped), undefined);
+
+  writeFileSync(join(agentDir, "keybindings.json"), "{ not json", "utf8");
+  const unreadable = readPiKeybindingsEnvironment(agentDir, "win32", {});
+  assert.equal(findDefaultShortcutReservedAction(unreadable), "app.model.cycleBackward");
+});
+
+void test("status report notes when pi's keybindings hold Alt+P", () => {
+  const runtime = createRuntimeState({ defaultShortcutReservedAction: "app.model.select" });
+  const report = buildStatusReport(createCommandContext(), runtime);
+
+  assert.match(report, /shortcut key: Alt\+P \(used by Pi for model select;/);
+  assert.doesNotMatch(
+    buildStatusReport(createCommandContext(), createRuntimeState()),
+    /used by Pi/
+  );
 });

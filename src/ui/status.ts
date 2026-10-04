@@ -4,9 +4,9 @@ import { buildEnhancerModeLabel } from "../enhance.js";
 import { analyzeDraftIntent } from "../intent.js";
 import { describeResolvedFamily, resolveTargetFamily } from "../model-routing.js";
 import {
+  describePiAction,
   formatShortcutKey,
   isDefaultShortcutConfigured,
-  isDefaultShortcutReservedByPi,
 } from "../shortcut-key.js";
 import { type PromptsmithRuntimeState } from "../state.js";
 import { type PromptsmithStatusSnapshot } from "../types.js";
@@ -46,6 +46,7 @@ export function buildStatusLine(snapshot: PromptsmithStatusSnapshot): string {
 export function buildStatusReport(ctx: ExtensionContext, runtime: PromptsmithRuntimeState): string {
   const snapshot = createStatusSnapshot(ctx, runtime);
   const settings = snapshot.settings;
+  const reservedAction = runtime.getDefaultShortcutReservedAction();
   const activeModel = snapshot.activeModel
     ? `${snapshot.activeModel.provider}/${snapshot.activeModel.id}`
     : "none";
@@ -91,8 +92,8 @@ export function buildStatusReport(ctx: ExtensionContext, runtime: PromptsmithRun
     `enabled: ${settings.enabled}`,
     `shortcut enabled: ${settings.shortcutEnabled}`,
     `shortcut key: ${formatShortcutKey(settings.shortcutKey)}${
-      isDefaultShortcutConfigured(settings) && isDefaultShortcutReservedByPi()
-        ? " (used by Pi for previous model on this platform; remap it in /promptsmith settings)"
+      isDefaultShortcutConfigured(settings) && reservedAction
+        ? ` (used by Pi for ${describePiAction(reservedAction)}; remap it in /promptsmith settings)`
         : ""
     }`,
     `status bar enabled: ${settings.statusBarEnabled}`,
