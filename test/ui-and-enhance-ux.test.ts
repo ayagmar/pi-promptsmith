@@ -246,6 +246,31 @@ void test("clearing the fixed enhancer model in fixed mode falls back to active 
   assert.equal(runtime.getSettings().fixedEnhancerModel, undefined);
 });
 
+void test("clearing the fixed enhancer model keeps a family model picked in the meantime", async () => {
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    enhancerModelMode: "fixed",
+    fixedEnhancerModel: { provider: "openai", id: "gpt-5-mini" },
+    familyEnhancerModels: { gpt: { provider: "openai", id: "gpt-5" } },
+  });
+
+  const ctx = createCommandContext();
+  Object.assign(ctx.ui, { custom: (_factory: unknown) => Promise.resolve("Clear") });
+
+  await runSettingsAction("fixedEnhancerModel", {
+    ctx,
+    runtime,
+    services: { refreshStatus: () => undefined },
+  });
+
+  assert.equal(runtime.getSettings().enhancerModelMode, "active");
+  assert.equal(runtime.getSettings().fixedEnhancerModel, undefined);
+  assert.deepEqual(runtime.getSettings().familyEnhancerModels, {
+    gpt: { provider: "openai", id: "gpt-5" },
+  });
+});
+
 void test("choosing family enhancer models in the settings ui keeps each pick", async () => {
   const runtime = createRuntimeState();
   runtime.replaceSettings({

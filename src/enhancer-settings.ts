@@ -18,12 +18,14 @@ export function setFixedEnhancerModel(
   };
 }
 
+// Fixed mode needs the fixed model, so clearing it falls back to the active model.
+// Family models picked in the meantime are kept for a later family-linked setup.
 export function clearFixedEnhancerModel(settings: PromptsmithSettings): PromptsmithSettings {
-  if (settings.enhancerModelMode === "fixed") {
-    return setActiveEnhancerModelMode(settings);
-  }
-
-  const next = { ...settings };
+  const next: PromptsmithSettings = {
+    ...settings,
+    enhancerModelMode:
+      settings.enhancerModelMode === "fixed" ? "active" : settings.enhancerModelMode,
+  };
   delete next.fixedEnhancerModel;
   return next;
 }
