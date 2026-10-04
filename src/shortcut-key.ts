@@ -153,6 +153,13 @@ export function validateShortcutKey(
     };
   }
 
+  // pi-tui splits key ids on "+", so it can never match a shortcut whose key is "+".
+  if (normalized.endsWith("++")) {
+    return {
+      error: "Pi cannot match the + key in a shortcut. Pick a different key.",
+    };
+  }
+
   if (UNMODIFIABLE_KEYS.has(parts.at(-1) ?? "")) {
     return {
       error: "Pi cannot detect Escape or F1-F12 with modifiers held. Pick a different key.",
