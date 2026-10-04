@@ -26,6 +26,7 @@ export function createPromptsmithExtension(
   let previousEditorFactory: ReturnType<ExtensionContext["ui"]["getEditorComponent"]>;
   let installedCustomShortcutKey: string | undefined;
   let activeCustomShortcutKey: string | undefined;
+  let lastSettingsWarning: string | undefined;
 
   const resolveCompleteFn = (ctx: ExtensionContext): CompleteFn =>
     options?.completeFn ?? createModelRegistryCompleteFn(ctx.modelRegistry);
@@ -135,10 +136,12 @@ export function createPromptsmithExtension(
   };
 
   const restorePersistedSettings = (ctx: ExtensionContext): void => {
+    // session_tree reloads the settings too; only warn when the problem is new.
     const warning = runtime.restoreSettings();
-    if (warning && ctx.hasUI) {
+    if (warning && warning !== lastSettingsWarning && ctx.hasUI) {
       ctx.ui.notify(warning, "warning");
     }
+    lastSettingsWarning = warning;
     refreshStatus(ctx);
   };
 
