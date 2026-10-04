@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -305,6 +307,24 @@ void test("settings writes leave no temp file behind, even when the rename fails
     new PromptsmithRuntimeState(blockedPath).persistSettings(runtime.getSettings());
   });
   assert.deepEqual(readdirSync(storageDir).sort(), ["blocked", "promptsmith-settings.json"]);
+});
+
+void test("settings writes keep a symlinked settings file linked", {
+  skip: process.platform === "win32" && "symlinks need extra privileges on Windows",
+}, () => {
+  const dotfilesDir = mkdtempSync(join(tmpdir(), "promptsmith-dotfiles-"));
+  const realPath = join(dotfilesDir, "promptsmith-settings.json");
+  writeFileSync(realPath, JSON.stringify(DEFAULT_SETTINGS), "utf8");
+  const agentDir = mkdtempSync(join(tmpdir(), "promptsmith-state-"));
+  const settingsPath = join(agentDir, "promptsmith-settings.json");
+  symlinkSync(realPath, settingsPath);
+
+  const runtime = new PromptsmithRuntimeState(settingsPath);
+  runtime.persistSettings({ ...runtime.getSettings(), rewriteMode: "plain" });
+
+  assert.equal(lstatSync(settingsPath).isSymbolicLink(), true);
+  assert.equal(JSON.parse(readFileSync(realPath, "utf8")).rewriteMode, "plain");
+  assert.deepEqual(readdirSync(dotfilesDir), ["promptsmith-settings.json"]);
 });
 
 void test("restoring an unreadable settings file warns and leaves the file alone", () => {
