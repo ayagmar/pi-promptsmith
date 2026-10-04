@@ -8,8 +8,9 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { DEFAULT_SETTINGS } from "../src/constants.js";
 import { setFamilyEnhancerModel } from "../src/enhancer-settings.js";
 import { matchesPattern, resolveTargetFamily } from "../src/model-routing.js";
 import { resolveEnhancerModel } from "../src/model-selection.js";
@@ -452,6 +453,43 @@ void test("global settings live in the pi agent dir, honoring PI_CODING_AGENT_DI
       delete process.env.PI_CODING_AGENT_DIR;
     } else {
       process.env.PI_CODING_AGENT_DIR = previous;
+    }
+  }
+});
+
+void test("settings saved in ~/.pi/agent are still read when PI_CODING_AGENT_DIR moves them", () => {
+  const agentDir = mkdtempSync(join(tmpdir(), "promptsmith-agent-dir-"));
+  const home = mkdtempSync(join(tmpdir(), "promptsmith-home-"));
+  const legacyPath = join(home, ".pi", "agent", "promptsmith-settings.json");
+  mkdirSync(dirname(legacyPath), { recursive: true });
+  writeFileSync(legacyPath, JSON.stringify({ ...DEFAULT_SETTINGS, rewriteMode: "plain" }), "utf8");
+  const previous = { agentDir: process.env.PI_CODING_AGENT_DIR, home: process.env.HOME };
+  process.env.PI_CODING_AGENT_DIR = agentDir;
+  process.env.HOME = home;
+
+  try {
+    const runtime = new PromptsmithRuntimeState();
+    const warning = runtime.restoreSettings();
+    assert.equal(runtime.getSettings().rewriteMode, "plain");
+    assert.match(warning ?? "", /loaded its settings from the old location/);
+    assert.ok(warning?.includes(legacyPath));
+
+    // Saving moves them to the new location and leaves the old file alone.
+    runtime.persistSettings(runtime.getSettings());
+    const newPath = join(agentDir, "promptsmith-settings.json");
+    assert.equal(existsSync(newPath), true);
+    assert.equal(existsSync(legacyPath), true);
+    assert.equal(new PromptsmithRuntimeState().restoreSettings(), undefined);
+  } finally {
+    for (const [name, value] of [
+      ["PI_CODING_AGENT_DIR", previous.agentDir],
+      ["HOME", previous.home],
+    ] as const) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
     }
   }
 });

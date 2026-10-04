@@ -218,6 +218,8 @@ Promptsmith saves global settings in:
 
 That is Pi's agent directory, so `PI_CODING_AGENT_DIR` moves it along with the rest of Pi's config.
 
+Promptsmith 0.4.0 and earlier always used `~/.pi/agent`, even with `PI_CODING_AGENT_DIR` set. If you set that variable, move `promptsmith-settings.json` into your agent directory. Until you do, Promptsmith reads the old file, warns at startup, and writes to the new location the next time you change a setting.
+
 Important defaults:
 
 - keyboard shortcut = `Alt+P` (not available on Windows and WSL; see Quick start)
