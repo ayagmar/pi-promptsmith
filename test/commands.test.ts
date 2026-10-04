@@ -482,7 +482,7 @@ void test("auto-send submits the enhanced prompt and clears the editor", async (
 
   assert.equal(ctx.uiState.editorText, "");
   assert.deepEqual(harness.userMessages, [{ content: "Enhanced prompt", options: undefined }]);
-  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /enhanced and sent/i);
+  assert.match(ctx.uiState.notifications.at(-1)?.message ?? "", /enhanced and submitted/i);
 });
 
 void test("auto-send uses the reviewed prompt when preview mode is on", async () => {
@@ -567,6 +567,82 @@ void test("auto-send leaves an empty reviewed prompt in the editor", async () =>
     ctx.uiState.notifications.map((entry) => entry.message).join("\n"),
     /final prompt is empty/i
   );
+});
+
+void test("auto-send keeps the refined prompt when no Pi model is selected", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const enhancer = createModel({ provider: "anthropic", id: "claude-haiku" });
+  const ctx = createCommandContext({ editorText: "draft", allModels: [enhancer] });
+
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    autoSendEnhancedPrompt: true,
+    enhancerModelMode: "fixed",
+    fixedEnhancerModel: { provider: "anthropic", id: "claude-haiku" },
+  });
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("Enhanced prompt")))
+  );
+
+  assert.equal(ctx.uiState.editorText, "Enhanced prompt");
+  assert.deepEqual(harness.userMessages, []);
+  assert.match(ctx.uiState.notifications.at(-2)?.message ?? "", /enhanced the current draft/i);
+  assert.deepEqual(ctx.uiState.notifications.at(-1), {
+    message:
+      "Promptsmith left the refined prompt in the editor because no Pi model is selected to send it to.",
+    type: "warning",
+  });
+});
+
+void test("auto-send keeps the refined prompt when the active model has no credentials", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel(), editorText: "draft" });
+  Object.assign(ctx.modelRegistry, {
+    hasConfiguredAuth: () => false,
+    getApiKeyAndHeaders: () =>
+      Promise.resolve({ ok: false, error: 'No API key found for "openai"' }),
+  });
+
+  runtime.replaceSettings({ ...runtime.getSettings(), autoSendEnhancedPrompt: true });
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("Enhanced prompt")))
+  );
+
+  assert.equal(ctx.uiState.editorText, "Enhanced prompt");
+  assert.deepEqual(harness.userMessages, []);
+  assert.match(
+    ctx.uiState.notifications.at(-1)?.message ?? "",
+    /left the refined prompt in the editor because openai\/gpt-5 has no usable credentials: No API key found/
+  );
+});
+
+void test("auto-send still submits when credentials only resolve at request time", async () => {
+  const runtime = createRuntimeState();
+  const harness = createMockPi();
+  const ctx = createCommandContext({ model: createModel(), editorText: "draft" });
+  Object.assign(ctx.modelRegistry, { hasConfiguredAuth: () => false });
+
+  runtime.replaceSettings({ ...runtime.getSettings(), autoSendEnhancedPrompt: true });
+
+  await handlePromptsmithCommand(
+    "",
+    ctx,
+    runtime,
+    createServices(harness, () => Promise.resolve(createCompleteResponse("Enhanced prompt")))
+  );
+
+  assert.equal(ctx.uiState.editorText, "");
+  assert.deepEqual(harness.userMessages, [{ content: "Enhanced prompt", options: undefined }]);
 });
 
 void test("cancelled enhancement leaves the editor unchanged", async () => {

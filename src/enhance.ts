@@ -150,7 +150,7 @@ export async function enhanceEditorDraft(
     attempt = buildEnhancementAttempt(prepared, tracker, "success");
     runtime.undo.store(draft);
 
-    const autoSendResult = sendEnhancedPromptIfConfigured(ctx, settings, finalText, services);
+    const autoSendResult = await sendEnhancedPromptIfConfigured(ctx, settings, finalText, services);
     if (!autoSendResult.sent) {
       ctx.ui.setEditorText(finalText);
     }
@@ -476,19 +476,21 @@ function buildEnhancementAttempt(
 }
 
 function buildSuccessMessage(tracker: EnhancementAttemptTracker, autoSent: boolean): string {
-  const action = autoSent ? "enhanced and sent the refined prompt" : "enhanced the current draft";
+  const action = autoSent
+    ? "enhanced and submitted the refined prompt"
+    : "enhanced the current draft";
 
   return tracker.recoveredAfterRetry
     ? `Promptsmith ${action} after retrying the model output format once.`
     : `Promptsmith ${action}.`;
 }
 
-function sendEnhancedPromptIfConfigured(
+async function sendEnhancedPromptIfConfigured(
   ctx: ExtensionContext,
   settings: PromptsmithSettings,
   finalText: string,
   services: Pick<EnhancementServices, "sendUserMessage">
-): { sent: boolean; error?: string } {
+): Promise<{ sent: boolean; error?: string }> {
   if (!settings.autoSendEnhancedPrompt) {
     return { sent: false };
   }
@@ -500,21 +502,53 @@ function sendEnhancedPromptIfConfigured(
     };
   }
 
+  // pi.sendUserMessage() returns void and reports a rejected send only as an
+  // extension error, after the editor has been cleared. Check what pi's prompt()
+  // requires up front so the refined prompt is not lost.
+  const blocker = await findAutoSendBlocker(ctx);
+  if (blocker) {
+    return {
+      sent: false,
+      error: `Promptsmith left the refined prompt in the editor because ${blocker}`,
+    };
+  }
+
   try {
     if (ctx.isIdle()) {
       services.sendUserMessage(finalText);
     } else {
       services.sendUserMessage(finalText, { deliverAs: settings.autoSendBusyBehavior });
     }
-
-    ctx.ui.setEditorText("");
-    return { sent: true };
   } catch (error) {
+    // Defensive: pi reports send failures asynchronously, but a synchronous throw
+    // must still leave the refined prompt in the editor.
     return {
       sent: false,
       error: `Promptsmith refined the draft, but auto-send failed: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
+
+  ctx.ui.setEditorText("");
+  return { sent: true };
+}
+
+async function findAutoSendBlocker(ctx: ExtensionContext): Promise<string | undefined> {
+  const model = ctx.model;
+  if (!model) {
+    return "no Pi model is selected to send it to.";
+  }
+
+  // While pi is busy the prompt is queued before pi checks auth.
+  if (!ctx.isIdle() || ctx.modelRegistry.hasConfiguredAuth(model)) {
+    return undefined;
+  }
+
+  // pi also accepts auth that is only resolved at request time, so only refuse
+  // when resolving it fails too.
+  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+  return auth.ok
+    ? undefined
+    : `${model.provider}/${model.id} has no usable credentials: ${auth.error}`;
 }
 
 function createCompletionStopReasonError(
