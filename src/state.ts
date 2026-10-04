@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
@@ -244,15 +244,28 @@ export function cloneSettings(settings: PromptsmithSettings): PromptsmithSetting
 }
 
 // Write a sibling temp file and rename it over the settings file, so a crash or a
-// full disk mid-write cannot leave a truncated file behind.
+// full disk mid-write cannot leave a truncated file behind. A symlinked settings
+// file (e.g. from a dotfiles repo) is written through, so the link stays.
 function writeSettingsToDisk(path: string, settings: PromptsmithSettings): void {
-  mkdirSync(dirname(path), { recursive: true });
-  const tempPath = `${path}.${process.pid}.tmp`;
+  const target = resolveSymlinkTarget(path);
+  mkdirSync(dirname(target), { recursive: true });
+  const tempPath = `${target}.${process.pid}.tmp`;
   try {
     writeFileSync(tempPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
-    renameSync(tempPath, path);
+    renameSync(tempPath, target);
   } catch (error) {
     rmSync(tempPath, { force: true });
+    throw error;
+  }
+}
+
+function resolveSymlinkTarget(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch (error) {
+    if (isRecord(error) && error.code === "ENOENT") {
+      return path;
+    }
     throw error;
   }
 }
