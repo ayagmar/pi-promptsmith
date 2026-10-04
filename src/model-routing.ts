@@ -75,11 +75,12 @@ function resolveBuiltinFamily(provider: string, id: string): ResolvedTargetFamil
 
 // Gateways put the vendor in the id ("anthropic/claude-…" on OpenRouter and Vercel,
 // "@cf/moonshotai/kimi-…" on Cloudflare) and Bedrock adds a region and vendor
-// ("us.anthropic.claude-…"). Match the built-in rules on the model name itself.
+// ("us.anthropic.claude-…", "us-gov.anthropic.…"; Kimi K2 Thinking uses "moonshot." rather
+// than "moonshotai."). Match the built-in rules on the model name itself.
 function modelName(id: string): string {
   return id
     .slice(id.lastIndexOf("/") + 1)
-    .replace(/^(?:[a-z]+\.)*(?:anthropic|openai|moonshotai)\./, "");
+    .replace(/^(?:[a-z0-9-]+\.)*(?:anthropic|openai|moonshot(?:ai)?)\./, "");
 }
 
 function globToRegExp(pattern: string): RegExp {
