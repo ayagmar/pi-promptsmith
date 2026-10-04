@@ -269,6 +269,8 @@ export function createCommandContext(options?: {
       find: (provider: string, id: string) =>
         allModels.find((model) => model.provider === provider && model.id === id),
       getAll: () => allModels,
+      hasConfiguredAuth: () => true,
+      getApiKeyAndHeaders: () => Promise.resolve({ ok: true, headers: {} }),
     },
     ui: {
       notify: (message: string, type?: "info" | "warning" | "error") => {
