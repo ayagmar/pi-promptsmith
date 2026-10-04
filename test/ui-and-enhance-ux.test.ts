@@ -315,6 +315,61 @@ void test("choosing family enhancer models in the settings ui keeps each pick", 
   );
 });
 
+void test("picking a fixed model in the settings ui keeps a family model picked earlier", async () => {
+  const runtime = createRuntimeState();
+  const ctx = createCommandContext();
+  const selections = ["openai/gpt-5", "anthropic/claude-haiku", "anthropic/claude-sonnet-4"];
+  Object.assign(ctx.ui, {
+    custom: (_factory: unknown) => Promise.resolve(selections.shift()),
+  });
+  const services = { refreshStatus: () => undefined };
+
+  await runSettingsAction("gptEnhancerModel", { ctx, runtime, services });
+  await runSettingsAction("fixedEnhancerModel", { ctx, runtime, services });
+
+  assert.equal(runtime.getSettings().enhancerModelMode, "fixed");
+  assert.deepEqual(runtime.getSettings().familyEnhancerModels, {
+    gpt: { provider: "openai", id: "gpt-5" },
+  });
+
+  await runSettingsAction("claudeEnhancerModel", { ctx, runtime, services });
+
+  assert.equal(runtime.getSettings().enhancerModelMode, "family-linked");
+  assert.equal(runtime.getSettings().fixedEnhancerModel, undefined);
+  assert.deepEqual(runtime.getSettings().familyEnhancerModels, {
+    gpt: { provider: "openai", id: "gpt-5" },
+    claude: { provider: "anthropic", id: "claude-sonnet-4" },
+  });
+  assert.equal(
+    ctx.uiState.notifications.at(-1)?.message,
+    "Claude-style enhancer model set to anthropic/claude-sonnet-4."
+  );
+});
+
+void test("choosing active mode in the settings ui keeps family model picks", async () => {
+  const runtime = createRuntimeState();
+  runtime.replaceSettings({
+    ...runtime.getSettings(),
+    enhancerModelMode: "fixed",
+    fixedEnhancerModel: { provider: "openai", id: "gpt-5-mini" },
+  });
+  const ctx = createCommandContext();
+  const selections = ["openai/gpt-5", "active — use the currently selected Pi model"];
+  Object.assign(ctx.ui, {
+    custom: (_factory: unknown) => Promise.resolve(selections.shift()),
+  });
+  const services = { refreshStatus: () => undefined };
+
+  await runSettingsAction("gptEnhancerModel", { ctx, runtime, services });
+  await runSettingsAction("enhancerModelMode", { ctx, runtime, services });
+
+  assert.equal(runtime.getSettings().enhancerModelMode, "active");
+  assert.equal(runtime.getSettings().fixedEnhancerModel, undefined);
+  assert.deepEqual(runtime.getSettings().familyEnhancerModels, {
+    gpt: { provider: "openai", id: "gpt-5" },
+  });
+});
+
 void test("clearing one family enhancer model keeps the other", async () => {
   const runtime = createRuntimeState();
   runtime.replaceSettings({
