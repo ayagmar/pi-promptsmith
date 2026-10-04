@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { DEFAULT_SETTINGS } from "../src/constants.js";
 import {
   findShortcutConflictAction,
   formatShortcutKey,
@@ -9,6 +10,7 @@ import {
   normalizeShortcutKey,
   validateShortcutKey,
 } from "../src/shortcut-key.js";
+import { sanitizeSettings } from "../src/state.js";
 import { buildStatusReport } from "../src/ui/status.js";
 import { createCommandContext, createRuntimeState } from "./helpers.js";
 
@@ -52,6 +54,20 @@ void test("shortcut validation rejects keys pi cannot match with modifiers", () 
     assert.match(validateShortcutKey(shortcutKey).error ?? "", /escape or f1-f12/i);
     assert.equal(getCustomShortcutKey({ ...settings, shortcutKey }), undefined);
   }
+});
+
+void test("shortcut validation rejects the + key, which pi cannot match", () => {
+  const settings = createRuntimeState().getSettings();
+
+  for (const shortcutKey of ["alt++", "ctrl+alt++"]) {
+    assert.match(validateShortcutKey(shortcutKey).error ?? "", /cannot match the \+ key/i);
+    assert.equal(getCustomShortcutKey({ ...settings, shortcutKey }), undefined);
+  }
+
+  assert.equal(
+    sanitizeSettings({ ...DEFAULT_SETTINGS, shortcutKey: "alt++" })?.shortcutKey,
+    DEFAULT_SETTINGS.shortcutKey
+  );
 });
 
 void test("shortcut conflict lookup finds matching built-in actions", () => {
