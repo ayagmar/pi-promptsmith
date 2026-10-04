@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { type CustomEditor } from "@earendil-works/pi-coding-agent";
 import { KeybindingsManager, TUI_KEYBINDINGS } from "@earendil-works/pi-tui";
-import { DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "../src/constants.js";
+import { DEFAULT_SETTINGS, DEFAULT_SHORTCUT_KEY, EXTENSION_COMMAND } from "../src/constants.js";
 import { createPromptsmithExtension } from "../src/index.js";
 import { PromptsmithRuntimeState } from "../src/state.js";
 import { createBasePromptsmithEditor } from "../src/ui/promptsmith-editor.js";
@@ -73,6 +73,38 @@ void test("session start warns when the saved settings cannot be read", async ()
   const warning = ctx.uiState.notifications.at(-1);
   assert.equal(warning?.type, "warning");
   assert.match(warning?.message ?? "", /could not parse/);
+});
+
+void test("an unreadable settings file warns once, not on every tree navigation", async () => {
+  const harness = createMockPi();
+  const storageDir = mkdtempSync(join(tmpdir(), "promptsmith-extension-"));
+  const settingsPath = join(storageDir, "promptsmith-settings.json");
+  writeFileSync(settingsPath, "{ not json", "utf8");
+  createPromptsmithExtension(harness.pi, {
+    runtime: new PromptsmithRuntimeState(settingsPath, () => undefined),
+  });
+
+  const ctx = createCommandContext();
+  const fire = async (event: string): Promise<void> => {
+    for (const handler of harness.events.get(event) ?? []) {
+      await handler({}, ctx);
+    }
+  };
+  const warnings = (): number =>
+    ctx.uiState.notifications.filter((entry) => entry.type === "warning").length;
+
+  await fire("session_start");
+  await fire("session_tree");
+  await fire("session_tree");
+  assert.equal(warnings(), 1);
+
+  writeFileSync(settingsPath, JSON.stringify(DEFAULT_SETTINGS), "utf8");
+  await fire("session_tree");
+  assert.equal(warnings(), 1);
+
+  writeFileSync(settingsPath, "{ not json", "utf8");
+  await fire("session_tree");
+  assert.equal(warnings(), 2);
 });
 
 void test("custom editor is not reinstalled when the shortcut setting is unchanged", async () => {
