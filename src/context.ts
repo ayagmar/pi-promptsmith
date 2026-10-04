@@ -114,7 +114,7 @@ function buildRecentConversationExcerpts(
       break;
     }
 
-    selected.push({ role: message.role, text, tokens, timestamp: message.timestamp });
+    selected.push({ role: message.role, text });
     remainingBudget -= tokens;
 
     if (selected.length >= MAX_CONVERSATION_MESSAGES) {

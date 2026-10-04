@@ -78,8 +78,6 @@ export interface ResolvedEnhancerModel {
 export interface ConversationExcerpt {
   role: "user" | "assistant";
   text: string;
-  tokens: number;
-  timestamp: number;
 }
 
 export interface ProjectMetadata {
