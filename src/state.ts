@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
   DEFAULT_ENHANCEMENT_TIMEOUT_MS,
@@ -29,11 +30,17 @@ export class PromptsmithRuntimeState {
   private defaultShortcutReservedAction: { action: string | undefined } | undefined;
   readonly undo = new UndoManager();
 
+  private readonly settingsPath: string;
+  private readonly legacySettingsPath: string | undefined;
+
   constructor(
-    private readonly settingsPath = getGlobalSettingsPath(),
+    settingsPath?: string,
     private readonly resolveDefaultShortcutReservedAction: () => string | undefined = () =>
       findDefaultShortcutReservedAction()
-  ) {}
+  ) {
+    this.settingsPath = settingsPath ?? getGlobalSettingsPath();
+    this.legacySettingsPath = settingsPath === undefined ? getLegacySettingsPath() : undefined;
+  }
 
   /**
    * The reserved pi action bound to Alt+P, if any; pi then skips Promptsmith's Alt+P.
@@ -61,12 +68,29 @@ export class PromptsmithRuntimeState {
 
   /** Reloads the saved settings. Returns a warning when the file exists but is unusable. */
   restoreSettings(): string | undefined {
-    const restored = readSettingsFromDisk(this.settingsPath);
+    const restored = this.readSettings();
     this.replaceSettings(restored.settings ?? cloneSettings(DEFAULT_SETTINGS));
     this.busy = false;
     this.lastEnhancementAttempt = undefined;
     this.undo.clear();
     return restored.warning;
+  }
+
+  private readSettings(): ReturnType<typeof readSettingsFromDisk> {
+    const restored = readSettingsFromDisk(this.settingsPath);
+    if (!restored.missing || !this.legacySettingsPath) {
+      return restored;
+    }
+
+    // Read-only fallback: the next save writes to the new location.
+    const legacy = readSettingsFromDisk(this.legacySettingsPath);
+    if (legacy.missing || !legacy.settings) {
+      return legacy.missing ? restored : legacy;
+    }
+    return {
+      settings: legacy.settings,
+      warning: `Promptsmith loaded its settings from the old location ${this.legacySettingsPath}. Change any setting once (or move the file) to store them in ${this.settingsPath}.`,
+    };
   }
 
   getLastDraftResolution(): PromptsmithDraftResolution | undefined {
@@ -115,9 +139,16 @@ export function getGlobalSettingsPath(): string {
   return join(getAgentDir(), "promptsmith-settings.json");
 }
 
+// Up to 0.4.0, settings always lived in ~/.pi/agent, even with PI_CODING_AGENT_DIR set.
+function getLegacySettingsPath(): string | undefined {
+  const legacyPath = join(homedir(), ".pi", "agent", "promptsmith-settings.json");
+  return resolve(legacyPath) === resolve(getGlobalSettingsPath()) ? undefined : legacyPath;
+}
+
 function readSettingsFromDisk(path: string): {
   settings?: PromptsmithSettings;
   warning?: string;
+  missing?: boolean;
 } {
   const fallback = "Promptsmith is using its default settings until you save one.";
   let raw: string;
@@ -125,7 +156,7 @@ function readSettingsFromDisk(path: string): {
     raw = readFileSync(path, "utf8");
   } catch (error) {
     if (isRecord(error) && error.code === "ENOENT") {
-      return {};
+      return { missing: true };
     }
     return { warning: `Promptsmith could not read ${path}: ${describeError(error)}. ${fallback}` };
   }
