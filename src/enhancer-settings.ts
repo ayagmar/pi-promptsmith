@@ -1,5 +1,7 @@
 import { type ModelRef, type PromptsmithFamily, type PromptsmithSettings } from "./types.js";
 
+// Full reset to the active model, dropping every saved enhancer model. Used by the
+// explicit `/promptsmith enhancer-model active` command.
 export function setActiveEnhancerModelMode(settings: PromptsmithSettings): PromptsmithSettings {
   const next = { ...settings, enhancerModelMode: "active" as const };
   delete next.fixedEnhancerModel;
@@ -7,15 +9,20 @@ export function setActiveEnhancerModelMode(settings: PromptsmithSettings): Promp
   return next;
 }
 
+// Switch to the active model from the settings menu. Family models picked so far
+// are kept, so a single pick still counts when the other family is chosen later.
+export function switchToActiveEnhancerModel(settings: PromptsmithSettings): PromptsmithSettings {
+  const next: PromptsmithSettings = { ...settings, enhancerModelMode: "active" };
+  delete next.fixedEnhancerModel;
+  return next;
+}
+
+// Family models picked so far are kept for a later family-linked setup.
 export function setFixedEnhancerModel(
   settings: PromptsmithSettings,
   modelRef: ModelRef
 ): PromptsmithSettings {
-  return {
-    ...setActiveEnhancerModelMode(settings),
-    enhancerModelMode: "fixed",
-    fixedEnhancerModel: modelRef,
-  };
+  return { ...settings, enhancerModelMode: "fixed", fixedEnhancerModel: modelRef };
 }
 
 // Fixed mode needs the fixed model, so clearing it falls back to the active model.

@@ -4,9 +4,9 @@ import { DEFAULT_SETTINGS, DEFAULT_SHORTCUT_KEY } from "../constants.js";
 import {
   clearFamilyEnhancerModel,
   clearFixedEnhancerModel,
-  setActiveEnhancerModelMode,
   setFamilyEnhancerModel,
   setFixedEnhancerModel,
+  switchToActiveEnhancerModel,
 } from "../enhancer-settings.js";
 import { normalize } from "../model-routing.js";
 import { parseModelRef } from "../model-selection.js";
@@ -185,7 +185,7 @@ export async function runSettingsAction(
           services,
           (latest) =>
             nextMode === "active"
-              ? setActiveEnhancerModelMode(latest)
+              ? switchToActiveEnhancerModel(latest)
               : { ...latest, enhancerModelMode: nextMode },
           `Enhancer model choice set to ${nextMode}.`
         );

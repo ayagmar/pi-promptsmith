@@ -299,7 +299,7 @@ function handleEnhancerModelCommand(
         ctx,
         runtime,
         services,
-        setFixedEnhancerModel(settings, modelRef),
+        setFixedEnhancerModel(setActiveEnhancerModelMode(settings), modelRef),
         `Fixed enhancer model set to ${modelRef.provider}/${modelRef.id}.`
       );
       return;
